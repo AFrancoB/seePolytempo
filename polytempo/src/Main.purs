@@ -40,7 +40,9 @@ data Action =
   Tempi (Array (Maybe Number)) |
   V1 (Maybe Number) | 
   V2 (Maybe Number) |
-  ConvergeAt (Maybe Number) | 
+  Eval (Maybe Number) |
+  CP (Maybe Number) |
+  -- ConvergeAt (Maybe Number) | 
   ConvergingFrom (Maybe Number) |
   WS (Maybe Number) |
   WE (Maybe Number)
@@ -50,7 +52,8 @@ type State = {
     tempi:: Array (Maybe Number), 
     v1:: Maybe Number, 
     v2:: Maybe Number, 
-    cAt:: Maybe Number, 
+    eval:: Maybe Number,
+    cP:: Maybe Number,
     cFrom:: Maybe Number, 
     ws:: Maybe Number,
     we:: Maybe Number
@@ -68,7 +71,8 @@ component =
       tempi: [Just 120.0, Just 90.0], 
       v1: Just 10.0, 
       v2: Just 13.0, 
-      cAt: Just 7.0, 
+      eval: Just 5.0,
+      cP: Just 5.0,
       cFrom: Just 11.0,
       ws: Just 0.0,
       we: Just 20.0
@@ -82,13 +86,15 @@ render state =
     , abstract
     , tempi "tempi" "120,90"
     , voice1 "Number of isochronous events of voice to be converged" "10"
-    , convergeAt "converged at" "7"
+    -- , convergeAt "converged at" "7"
+    , eval "evaluation at" "5"
+    , convergencePoint "convergence point at" "5"
     , voice2 "Number of isochronous events of voice converging" "13"
     , convergingFrom "converging from" "11"
     , ws "window start (in seconds)" "0.0"
     , we "window end (in seconds)" "20.0"
     -- , eval "evaluate"
-    , HH.text $ calculationExplained (fromMaybe (Just 2666.0) $ state.tempi!!0) (fromMaybe (Just 2666.0) $ state.tempi!!1) state.v1 state.v2 state.cAt state.cFrom
+    -- , HH.text $ calculationExplained (fromMaybe (Just 2666.0) $ state.tempi!!0) (fromMaybe (Just 2666.0) $ state.tempi!!1) state.v1 state.v2 state.cAt state.cFrom
 --    , HH.div_ [HH.text $ calculateWindow state 5.0 5.0]
     , HH.div [ HP.style "left: 2000px;" ] $ [svgNodeToHtml $ svg state]
     ]
@@ -173,15 +179,23 @@ voice2 d i = HH.div_ [
               ]
   ]
 
-convergeAt d i = HH.div_ [ 
+eval d i = HH.div_ [ 
     HH.div_ [HH.text d]
   , HH.input [ HP.type_ HP.InputText
               , HP.placeholder i
-              , HE.onValueInput \str -> ConvergeAt $ fromString str
+              , HE.onValueInput \str -> Eval $ fromString str
               -- , HP.value state.input
               ]
   ]
 
+convergencePoint d i = HH.div_ [ 
+    HH.div_ [HH.text d]
+  , HH.input [ HP.type_ HP.InputText
+              , HP.placeholder i
+              , HE.onValueInput \str -> CP $ fromString str
+              -- , HP.value state.input
+              ]
+  ]
 convergingFrom d i = HH.div_ [ 
     HH.div_ [HH.text d]
   , HH.input [ HP.type_ HP.InputText
@@ -229,8 +243,11 @@ setVoice1 n state = state { v1 = n }
 setVoice2 :: Maybe Number -> State -> State
 setVoice2 n state = state { v2 = n }
 
-setConvergeAt :: Maybe Number -> State -> State
-setConvergeAt n state = state { cAt = n }
+setEval :: Maybe Number -> State -> State
+setEval e state = state { eval = e }
+
+setCP :: Maybe Number -> State -> State
+setCP e state = state { cP = e }
 
 setConvergingFrom :: Maybe Number  -> State -> State
 setConvergingFrom n state = state { cFrom = n }
@@ -249,7 +266,8 @@ handleAction = case _ of
   Tempi mns -> H.modify_ \state -> setTempi mns state
   V1 mn -> H.modify_ \state -> setVoice1 mn state
   V2 mn -> H.modify_ \state -> setVoice2 mn state
-  ConvergeAt mn -> H.modify_ \state -> setConvergeAt mn state
+  Eval mn -> H.modify_ \state -> setEval mn state
+  CP mn -> H.modify_ \state -> setCP mn state
   ConvergingFrom mn -> H.modify_ \state -> setConvergingFrom mn state
   WS mn -> H.modify_ \state -> setWS mn state
   WE mn -> H.modify_ \state -> setWE mn state
@@ -257,7 +275,7 @@ handleAction = case _ of
 
 drawCP:: State -> Number -> Number -> SvgNode
 drawCP st ws we = 
-  let cp = f st.cAt / f st.v1
+  let cp = (f st.eval + (f st.cP)) / f st.v1
       dur = durInSecs $ Tuple (f st.v1) $ f (fromMaybe (Just 1.0) (st.tempi!!0))
   in cpLine $ dur * cp
 
@@ -399,7 +417,7 @@ calculateEvents:: State -> Number -> Number -> Window
 calculateEvents state ws we = {start: wStart, end: wEnd}
   where voice1 = Tuple (1.0) $ f (fromMaybe (Just 1.0) $ state.tempi!!0)
         voice2 = Tuple (1.0) $ f (fromMaybe (Just 1.0) $ state.tempi!!1)
-        cAt = f state.cAt / 1.0
+        cAt = ((f state.eval) + (f state.cP)) / 1.0
         cFrom = f state.cFrom / 1.0
         wStart = converge ws voice1 cAt voice2 cFrom
         wEnd = converge we voice1 cAt voice2 cFrom
@@ -409,7 +427,7 @@ calculateWindow:: State -> Number -> Number -> Window
 calculateWindow state ws we = {start: wStart, end: wEnd}
   where voice1 = Tuple (f state.v1) $ f (fromMaybe (Just 1.0) $ state.tempi!!0)
         voice2 = Tuple (f state.v2) $ f (fromMaybe (Just 1.0) $ state.tempi!!1)
-        cAt = f state.cAt / f state.v1
+        cAt = ((f state.eval) + (f state.cP)) / f state.v1
         cFrom = f state.cFrom / f state.v2
         wStart = converge ws voice1 cAt voice2 cFrom
         wEnd = converge we voice1 cAt voice2 cFrom
@@ -446,6 +464,16 @@ st = {tempi: [Just 120.0, Just 90.0], v1: Just 10.0, v2: Just 13.0, cAt: Just 7.
 
 
 ----  is this correct? think about it and then implement
+
+data Polytemporal = 
+  Kairos | -- start program at evaluation time (or as soon as possible)
+  Metric Number Number | -- start program at a given point of the metric voice
+  Converge String Number Number -- start program in relationship with other voice
+  
+
+
+
+
     
 data Convergence = Convergence Number Number  -- numbers should be substituted with a proper coordinate system
 instance Show Convergence where
@@ -456,11 +484,6 @@ instance Show Voice where
     show (Voice t conv) = " t: " <> show t <> " conv: " <> show conv
 
 type PolyTempo = M.Map String Voice
-
-
-
-
-
 
 
 
@@ -485,4 +508,3 @@ svgNodeToHtml :: forall p i. SvgNode -> HH.HTML p i
 svgNodeToHtml (SvgElement element) = svgElementToHtml element
 svgNodeToHtml (SvgText str) = HH.text str
 svgNodeToHtml (SvgComment _str) = HH.text ""
-
