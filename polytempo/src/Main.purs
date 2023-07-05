@@ -465,12 +465,6 @@ st = {tempi: [Just 120.0, Just 90.0], v1: Just 10.0, v2: Just 13.0, cAt: Just 7.
 
 ----  is this correct? think about it and then implement
 
-data Polytemporal = 
-  Kairos | -- start program at evaluation time (or as soon as possible)
-  Metric Number Number | -- start program at a given point of the metric voice
-  Converge String Number Number -- start program in relationship with other voice
-  
-
 
 
 
