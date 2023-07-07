@@ -1,4 +1,4 @@
-module Parser where
+module Parser(polytemporal, Temporal(..), Polytemporal(..)) where
 
 import Prelude
 
@@ -11,6 +11,8 @@ import Data.Map (Map(..), lookup, keys, singleton, fromFoldable, toUnfoldable, m
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Set as Set
 
+import Data.FunctorWithIndex (mapWithIndex)
+
 import Data.String.CodeUnits (fromCharArray)
 
 import Parsing
@@ -21,28 +23,34 @@ import Parsing.Combinators.Array (many)
 import Parsing.Language (haskellStyle)
 import Parsing.Token (makeTokenParser)
 
+import Rhythm
+
 type P = ParserT String Identity
 
-
-polytemporal:: P (Map String Polytemporal)
+-- temporal not polytemporal
+polytemporal:: P (Map String Temporal)
 polytemporal = do
     whitespace
-    x <- polytemporalRelation `endBy` charWS ';'
+    -- x <- polytemporalRelation `endBy` charWS ';'
+    x <- many polytemporalRelation
     _ <- pure 1
     eof
     pure $ fromFoldable x
 
-polytemporalRelation:: P (Tuple String Polytemporal)
+polytemporalRelation:: P (Tuple String Temporal)
 polytemporalRelation = do
     _ <- pure 1
-    _ <- reserved ">"
-    x <- choice [try metric, kairos, converge]
-    pure x
+    whitespace
+    x <- choice [try metric, try kairos, converge]
+    _ <- charWS '|'
+    y <- rhythmic
+    pure $ Tuple (fst x) $ Temporal (snd x) (fst y) (snd y)
 
 kairos:: P (Tuple String Polytemporal)
 kairos = do
     _ <- pure 1
     id <- voiceId
+    _ <- reserved "<-"
     n <- choice [toNumber' <$> naturalOrFloat,asap]
     pure $ Tuple id $ Kairos n
 
@@ -56,6 +64,7 @@ metric:: P (Tuple String Polytemporal)
 metric = do
     _ <- pure 1
     id <- voiceId
+    _ <- reserved "<-"
     x <- choice [toNumber' <$> naturalOrFloat, cAt]
     y <- choice [toNumber' <$> naturalOrFloat, cFrom]
     pure $ Tuple id $ Metric x y
@@ -76,75 +85,55 @@ converge:: P (Tuple String Polytemporal)
 converge = do
     _ <- pure 1
     id <- voiceId
-    _ <- charWS '\\'
-    voice <- many $ noneOf ['\\','<',' ']
-    _ <- charWS ' '
+    _ <- reserved "<-"
+    _ <- whitespace
+    voice <- voiceId
     x <- choice [toNumber' <$> naturalOrFloat, cAt]
     y <- choice [toNumber' <$> naturalOrFloat, cFrom]
-    pure $ Tuple id $ Converge (fromCharArray voice) x y
+    pure $ Tuple id $ Converge voice x y
 
 voiceId:: P String 
 voiceId = do
+    _ <- pure 1
     _ <- char '\\'
     x <- many $ noneOf ['\\','<',' ']
-    _ <- whitespace
-    _ <- reserved "<-"
+    _ <- charWS ' '
     pure $ fromCharArray x
 
 
 
+test :: String -> Either String (Map String Temporal)
+test x =
+  case runParser x polytemporal of
+    Left (ParseError err _) -> Left err
+    Right aMap -> case check aMap of
+                    true -> Right aMap
+                    false -> Left "failed the check"
+
+check :: Map String Temporal -> Boolean
+check aMap = not $ elem false $ mapWithIndex (check2 aMap Nil) aMap   
+
+check2 :: Map String Temporal -> List String -> String -> Temporal -> Boolean
+check2 aMap alreadyRefd aKey (Temporal (Kairos _) _ _) = true
+check2 aMap alreadyRefd aKey (Temporal (Metric _ _) _ _) = true
+check2 aMap alreadyRefd aKey (Temporal (Converge anotherKey _ _) _ _) =
+  case lookup anotherKey aMap of
+    Nothing -> false
+    Just anotherValue -> case elem aKey alreadyRefd of
+                           true -> false
+                           false -> check2 aMap (aKey : alreadyRefd) anotherKey anotherValue
 
 
+data Temporal = Temporal Polytemporal Rhythmic Boolean
 
-
-
-
-
-check':: Map String Polytemporal -> Bool
-check' mapa = check checked next mapa
-    where checked = (Nil)
-          next = fromMaybe "" $ head $ Set.toUnfoldable $ keys mapa
-
-check:: List String -> String -> Map String Polytemporal -> Boolean
-check checked next mapa 
-    | notConvergent next mapa = true
-    | otherwise = if nextChecked then false else check newChecked newNext mapa
-    where nextChecked = isNextChecked checked next
-          newChecked = (next : checked)
-          newNext = fromMaybe "" $ head $ filter (\x -> not $ elem x newChecked) $ Set.toUnfoldable $ keys mapa -- :: List String
-
-notConvergent:: String -> Map String Polytemporal -> Boolean
-notConvergent next mapa = f m
-    where m = lookup next mapa 
-
-f:: Maybe Polytemporal -> Boolean
-f Nothing = false
-f (Just x) = g x 
-
-g (Kairos _) = true 
-g (Metric _ _) = true
-g (Converge _ _ _) = false
-
-isNextChecked:: List String -> String -> Boolean
-isNextChecked checked next = elem next checked
-
-
-
--- check :: List String -> String -> Map String Layer -> Bool
-
--- check thingsAlreadyRefd nextReference map
-
--- check ["x"] "x" map ...
--- if nextReference is universal time, return true
--- otherwise, if the next layer to be referenced is already in the list, return false
--- if the next layer is not already in the list, add it to the list and return the recursive result of check theList theNextRef theMap
-
+instance temporalShow :: Show Temporal where
+    show (Temporal x y z) = show x <> " " <> show y <> (if z then "looped" else "unlooped")
 
 
 data Polytemporal = 
   Kairos Number | -- Arg: universal time unit (miliseconds and datetime in purs)
   -- Kairos starts a program at evaluation time (or as soon as possible), no underlying grid
-  Metric Number Number | -- 
+  Metric Number Number | -- starts a program attached to a default underlying voice (a tempo grid basically) first number is the point to where the new voice will converge, second number is the point from which it converges. first _ is 0 and second _ is 0 (so both voices align at index 0)
   Converge String Number Number -- Args: String is the voice identifier, convergAt (where this voice converges with the identified voice) and convergedFrom (the point of this voice that converges with the identified voice)
   -- Converge starts a program in relationship with another voice
 

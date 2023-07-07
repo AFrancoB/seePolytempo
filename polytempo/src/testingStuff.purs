@@ -1,4 +1,4 @@
-module Main where
+module Trial where
 
 import Prelude
 
@@ -77,7 +77,7 @@ render state =
     [ header
     , subHeader
     , abstract
-    , program "program" "\\v0 <- _;",
+    , program "program" "\\v0 <- _ | x :||",
     HH.text $ f $ pErrorToString $ runParser state.program polytemporal
    ]
 
