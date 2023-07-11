@@ -51,8 +51,9 @@ kairos = do
     _ <- pure 1
     id <- voiceId
     _ <- reserved "<-"
+    t <- tempo <|> pure 120.0 -- the alternative should be same as estuary tempo
     n <- choice [toNumber' <$> naturalOrFloat,asap]
-    pure $ Tuple id $ Kairos n
+    pure $ Tuple id $ Kairos n t
 
 asap:: P Number
 asap = do
@@ -65,9 +66,10 @@ metric = do
     _ <- pure 1
     id <- voiceId
     _ <- reserved "<-"
+    t <- tempo <|> pure 120.0 -- the alternative should be same as estuary tempo
     x <- choice [toNumber' <$> naturalOrFloat, cAt]
     y <- choice [toNumber' <$> naturalOrFloat, cFrom]
-    pure $ Tuple id $ Metric x y
+    pure $ Tuple id $ Metric x y t
 
 cAt:: P Number 
 cAt = do
@@ -86,11 +88,12 @@ converge = do
     _ <- pure 1
     id <- voiceId
     _ <- reserved "<-"
+    t <- tempo <|> pure 120.0 -- the alternative should be same as estuary tempo
     _ <- whitespace
     voice <- voiceId
     x <- choice [toNumber' <$> naturalOrFloat, cAt]
     y <- choice [toNumber' <$> naturalOrFloat, cFrom]
-    pure $ Tuple id $ Converge voice x y
+    pure $ Tuple id $ Converge voice x y t
 
 voiceId:: P String 
 voiceId = do
@@ -100,6 +103,12 @@ voiceId = do
     _ <- charWS ' '
     pure $ fromCharArray x
 
+tempo:: P Number 
+tempo = do
+  _ <- pure 1
+  x <- toNumber' <$> naturalOrFloat
+  _ <- reserved "bpm"
+  pure x
 
 
 test :: String -> Either String (Map String Temporal)
@@ -114,9 +123,9 @@ check :: Map String Temporal -> Boolean
 check aMap = not $ elem false $ mapWithIndex (check2 aMap Nil) aMap   
 
 check2 :: Map String Temporal -> List String -> String -> Temporal -> Boolean
-check2 aMap alreadyRefd aKey (Temporal (Kairos _) _ _) = true
-check2 aMap alreadyRefd aKey (Temporal (Metric _ _) _ _) = true
-check2 aMap alreadyRefd aKey (Temporal (Converge anotherKey _ _) _ _) =
+check2 aMap alreadyRefd aKey (Temporal (Kairos _ _) _ _) = true
+check2 aMap alreadyRefd aKey (Temporal (Metric _ _ _) _ _) = true
+check2 aMap alreadyRefd aKey (Temporal (Converge anotherKey _ _ _) _ _) =
   case lookup anotherKey aMap of
     Nothing -> false
     Just anotherValue -> case elem aKey alreadyRefd of
@@ -131,16 +140,16 @@ instance temporalShow :: Show Temporal where
 
 
 data Polytemporal = 
-  Kairos Number | -- Arg: universal time unit (miliseconds and datetime in purs)
+  Kairos Number Number | -- last arg is tempo -- Arg: universal time unit (miliseconds and datetime in purs)
   -- Kairos starts a program at evaluation time (or as soon as possible), no underlying grid
-  Metric Number Number | -- starts a program attached to a default underlying voice (a tempo grid basically) first number is the point to where the new voice will converge, second number is the point from which it converges. first _ is 0 and second _ is 0 (so both voices align at index 0)
-  Converge String Number Number -- Args: String is the voice identifier, convergAt (where this voice converges with the identified voice) and convergedFrom (the point of this voice that converges with the identified voice)
+  Metric Number Number Number | -- starts a program attached to a default underlying voice (a tempo grid basically) first number is the point to where the new voice will converge, second number is the point from which it converges. first _ is 0 and second _ is 0 (so both voices align at index 0)
+  Converge String Number Number Number -- Args: String is the voice identifier, convergAt (where this voice converges with the identified voice) and convergedFrom (the point of this voice that converges with the identified voice)
   -- Converge starts a program in relationship with another voice
 
 instance polytemporalShowInstance :: Show Polytemporal where
-  show (Kairos timemark) = "kairos: " <> show timemark
-  show (Metric cAt cFrom) = "voice aligns with metric at "<>show cAt<>" from "<>show cFrom
-  show (Converge voice cAt cFrom) = "voice aligns with "<>show voice<>" at "<>show cAt<>" from "<>show cFrom
+  show (Kairos timemark tempo) = "kairos: " <> show timemark <> " tempo: " <> show tempo
+  show (Metric cAt cFrom t) = "voice aligns with metric at "<>show cAt<>" from "<>show cFrom <> " tempo: " <> show t
+  show (Converge voice cAt cFrom t) = "voice aligns with "<>show voice<>" at "<>show cAt<>" from "<>show cFrom <> " tempo: " <> show t
 
 
 tokenParser = makeTokenParser haskellStyle

@@ -460,7 +460,7 @@ freqToDur freq = 1.0 / freq
 
 bpmToDur bpm = 1.0 / bpmToFreq bpm
 
-st = {tempi: [Just 120.0, Just 90.0], v1: Just 10.0, v2: Just 13.0, cAt: Just 7.0, cFrom: Just 11.0}
+drawData = {tempi: [Just 120.0, Just 90.0], v1: Just 10.0, v2: Just 13.0, cAt: Just 7.0, cFrom: Just 11.0}
 
 
 ----  is this correct? think about it and then implement

@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+  <head>
+    <title>test</title>
+    <script src="./index.js" type="module"></script>
+  </head>
+  <body onload="launchPage()">
+    <script type="module"> // perhaps here we need the timeknot.js file... not sure...
+      import {main} from './index.js'
+
+      function launchPage(){
+	            window.launchPage = main() 
+            }
+
+
+      window.launchPage = launchPage;
+  </script>
+  
+  </body>
+</html>

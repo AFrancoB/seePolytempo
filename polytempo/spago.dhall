@@ -12,7 +12,25 @@ to generate this file without the comments in this block.
 -}
 { name = "my-project"
 , dependencies =
-  [ "console", "effect", "halogen", "parsing", "prelude", "svg-parser" ]
+  [ "arrays"
+  , "bifunctors"
+  , "console"
+  , "effect"
+  , "either"
+  , "foldable-traversable"
+  , "halogen"
+  , "identity"
+  , "integers"
+  , "lists"
+  , "maybe"
+  , "numbers"
+  , "ordered-collections"
+  , "parsing"
+  , "prelude"
+  , "strings"
+  , "svg-parser"
+  , "tuples"
+  ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
 }

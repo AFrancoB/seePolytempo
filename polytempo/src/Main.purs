@@ -78,7 +78,7 @@ component =
     }
   where
   initialState _ = {
-      program: "v0 <- _" 
+      program: "v0 <- 120bpm _ | x :|" 
   }
 
 render state =
@@ -87,7 +87,7 @@ render state =
     [ header
     , subHeader
     , abstract
-    , program "program" "\\v0 <- _ | x :||",
+    , program "program" "\\v0 <- 120bpm _ | x :|",
     HH.text $ f $ pErrorToString $ runParser state.program polytemporal
    ]
 
@@ -131,25 +131,3 @@ handleAction :: forall output m. Action -> H.HalogenM State Action () output m U
 handleAction = case _ of
   Program str -> H.modify_ \state -> setProgram str state
 
-
--- ---- halogen svg stuff
--- ns :: HH.Namespace
--- ns = HH.Namespace "http://www.w3.org/2000/svg"
-
--- svgAttributeToProp :: forall r i. SvgAttribute -> HP.IProp r i
--- svgAttributeToProp (SvgAttribute k v) = HP.attr (HH.AttrName k) v
-
--- svgElementToHtml :: forall p i. Element -> HH.HTML p i
--- svgElementToHtml ele = svgElementToHtmlWithAttrs ele []
-
--- svgElementToHtmlWithAttrs :: forall p r i. Element -> Array (HP.IProp r i) -> HH.HTML p i
--- svgElementToHtmlWithAttrs ele newAttrs =
---   HH.elementNS ns (HH.ElemName ele.name) (attrs <> newAttrs) children
---   where
---     attrs = fromFoldable $ svgAttributeToProp <$> ele.attributes
---     children = fromFoldable $ svgNodeToHtml <$> ele.children
-
--- svgNodeToHtml :: forall p i. SvgNode -> HH.HTML p i
--- svgNodeToHtml (SvgElement element) = svgElementToHtml element
--- svgNodeToHtml (SvgText str) = HH.text str
--- svgNodeToHtml (SvgComment _str) = HH.text ""
