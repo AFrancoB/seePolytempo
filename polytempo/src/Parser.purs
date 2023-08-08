@@ -1,4 +1,4 @@
-module Parser(polytemporal, Temporal(..), Polytemporal(..)) where
+module Parser(polytemporal, Temporal(..), Polytemporal(..), check, test) where
 
 import Prelude
 
@@ -59,7 +59,7 @@ asap:: P Number
 asap = do
     _ <- pure 1
     x <- charWS '_'
-    pure 0.0
+    pure 0.1 -- this has to be adjusted later
 
 metric:: P (Tuple String Polytemporal)
 metric = do
