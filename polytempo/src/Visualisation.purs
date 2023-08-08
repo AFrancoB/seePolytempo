@@ -151,7 +151,16 @@ calculateSVGElement mapa ws we eval aKey (Temporal (Metric cTo cFrom t) rhythmic
         unlooped = filter (\x -> x /= (Tuple 0.0 0.0)) $ voiceInWindowUnlooped startOfVoice (startOfVoice+dur) ws we
         looped = filter (\x -> x /= (Tuple 0.0 0.0)) $ voiceInWindowLooped startOfVoice (startOfVoice+dur) ws we
 
-calculateSVGElement mapa ws we eval aKey _ = []  
+calculateSVGElement mapa ws we eval aKey _ = []  -- 
+
+-- TODO:
+---- tests make all the tests
+---- make the Converge polytemporal relation
+---- Make the Event visualiser (the events within the voice, this is the one that is easily translated into sound):
+      -- So the Tuple Number Number needs to become: Constructor (Tuple Number Number) (List Number), where the list of numbers is the moment in which the event is drawn. 
+
+      -- both events and voices need to be indexed. something like: Ix 0 0, Ix 0 1, Ix 0 2, Ix 0 3 would represent a rhythm like xxxx the voice iteration 0 (first) with the event index 0,  voice iteration 0 with event index 1, etc...
+
 
 
 -- durs are in seconds but convergences are in percentage: multiply them

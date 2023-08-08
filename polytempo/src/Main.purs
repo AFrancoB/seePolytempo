@@ -151,7 +151,8 @@ program d i = HH.div_ [
         [ 
           -- HP.class_ "edit"
         -- , HP.value state.program
-          HE.onValueInput \s -> Program s
+          HP.placeholder i
+        , HE.onValueInput \s -> Program s
         ]
   -- , HH.input [ HP.type_ HP.InputText
   --             , HP.placeholder i

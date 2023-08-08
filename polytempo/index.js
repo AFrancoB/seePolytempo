@@ -32640,7 +32640,7 @@ var setEval = function(mn) {
 };
 var program = function(d) {
   return function(i2) {
-    return div_([div_([text5(d)]), textarea([onValueInput(function(s) {
+    return div_([div_([text5(d)]), textarea([placeholder3(i2), onValueInput(function(s) {
       return new Program(s);
     })])]);
   };
@@ -32682,7 +32682,7 @@ var handleAction = function(v) {
     });
   }
   ;
-  throw new Error("Failed pattern match at Main (line 176, column 16 - line 180, column 50): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Main (line 177, column 16 - line 181, column 50): " + [v.constructor.name]);
 };
 var f = function(n) {
   return fromMaybe(2.666)(n);
