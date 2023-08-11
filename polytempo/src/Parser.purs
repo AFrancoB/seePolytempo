@@ -41,7 +41,7 @@ polytemporalRelation:: P (Tuple String Temporal)
 polytemporalRelation = do
     _ <- pure 1
     whitespace
-    x <- choice [try metric, try kairos, converge]
+    x <- choice [ try kairos, try metric, converge]
     _ <- charWS '|'
     y <- rhythmic
     pure $ Tuple (fst x) $ Temporal (snd x) (fst y) (snd y)
@@ -51,8 +51,8 @@ kairos = do
     _ <- pure 1
     id <- voiceId
     _ <- reserved "<-"
-    t <- tempo <|> pure 120.0 -- the alternative should be same as estuary tempo
     n <- choice [toNumber' <$> naturalOrFloat,asap]
+    t <- tempo <|> pure 120.0 -- the alternative should be same as estuary tempo
     pure $ Tuple id $ Kairos n t
 
 asap:: P Number
@@ -66,9 +66,9 @@ metric = do
     _ <- pure 1
     id <- voiceId
     _ <- reserved "<-"
-    t <- tempo <|> pure 120.0 -- the alternative should be same as estuary tempo
     x <- choice [toNumber' <$> naturalOrFloat, cAt]
     y <- choice [toNumber' <$> naturalOrFloat, cFrom]
+    t <- tempo <|> pure 120.0 -- the alternative should be same as estuary tempo
     pure $ Tuple id $ Metric x y t
 
 cAt:: P Number 
@@ -88,20 +88,18 @@ converge = do
     _ <- pure 1
     id <- voiceId
     _ <- reserved "<-"
-    t <- tempo <|> pure 120.0 -- the alternative should be same as estuary tempo
     _ <- whitespace
     voice <- voiceId
     x <- choice [toNumber' <$> naturalOrFloat, cAt]
     y <- choice [toNumber' <$> naturalOrFloat, cFrom]
+    t <- tempo <|> pure 120.0 -- the alternative should be same as estuary tempo
     pure $ Tuple id $ Converge voice x y t
 
 voiceId:: P String 
 voiceId = do
     _ <- pure 1
-    _ <- char '\\'
-    x <- many $ noneOf ['\\','<',' ']
-    _ <- charWS ' '
-    pure $ fromCharArray x
+    x <- identifier -- many $ noneOf ['\\','<',' ']
+    pure x
 
 tempo:: P Number 
 tempo = do
@@ -136,7 +134,7 @@ check2 aMap alreadyRefd aKey (Temporal (Converge anotherKey _ _ _) _ _) =
 data Temporal = Temporal Polytemporal Rhythmic Boolean
 
 instance temporalShow :: Show Temporal where
-    show (Temporal x y z) = show x <> " " <> show y <> (if z then "looped" else "unlooped")
+    show (Temporal x y z) = show x <> " " <> show y <> (if z then " looped" else " unlooped")
 
 
 data Polytemporal = 
@@ -148,8 +146,8 @@ data Polytemporal =
 
 instance polytemporalShowInstance :: Show Polytemporal where
   show (Kairos timemark tempo) = "kairos: " <> show timemark <> " tempo: " <> show tempo
-  show (Metric cAt cFrom t) = "voice aligns with metric at "<>show cAt<>" from "<>show cFrom <> " tempo: " <> show t
-  show (Converge voice cAt cFrom t) = "voice aligns with "<>show voice<>" at "<>show cAt<>" from "<>show cFrom <> " tempo: " <> show t
+  show (Metric cTo cFrom t) = "voice aligns with metric at "<>show cTo<>" from "<>show cFrom <> " tempo: " <> show t
+  show (Converge voice cTo cFrom t) = "voice aligns with "<>show voice<>" at "<>show cTo<>" from "<>show cFrom <> " tempo: " <> show t
 
 
 tokenParser = makeTokenParser haskellStyle

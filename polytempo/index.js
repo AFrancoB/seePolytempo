@@ -2680,12 +2680,12 @@ var foldableMaybe = {
 var foldMapDefaultR = function(dictFoldable) {
   var foldr22 = foldr(dictFoldable);
   return function(dictMonoid) {
-    var append8 = append(dictMonoid.Semigroup0());
+    var append7 = append(dictMonoid.Semigroup0());
     var mempty2 = mempty(dictMonoid);
     return function(f2) {
       return foldr22(function(x) {
         return function(acc) {
-          return append8(f2(x))(acc);
+          return append7(f2(x))(acc);
         };
       })(mempty2);
     };
@@ -32071,18 +32071,35 @@ var SvgComment = /* @__PURE__ */ function() {
 }();
 
 // output/Visualisation/index.js
+var show4 = /* @__PURE__ */ show(showNumber);
 var fromFoldable6 = /* @__PURE__ */ fromFoldable(foldableArray);
 var fromFoldable1 = /* @__PURE__ */ fromFoldable3(foldableList);
 var map29 = /* @__PURE__ */ map(functorList);
-var append7 = /* @__PURE__ */ append(semigroupArray);
+var append12 = /* @__PURE__ */ append(semigroupArray);
 var map111 = /* @__PURE__ */ map(functorArray);
 var add2 = /* @__PURE__ */ add(semiringNumber);
 var scanl3 = /* @__PURE__ */ scanl(traversableArray);
 var fromFoldable22 = /* @__PURE__ */ fromFoldable3(foldableArray);
 var sum2 = /* @__PURE__ */ sum(foldableList)(semiringNumber);
-var show4 = /* @__PURE__ */ show(showNumber);
+var lookup6 = /* @__PURE__ */ lookup(ordString);
 var notEq2 = /* @__PURE__ */ notEq(/* @__PURE__ */ eqTuple(eqNumber)(eqNumber));
 var mapWithIndex4 = /* @__PURE__ */ mapWithIndex(functorWithIndexMap);
+var Triplet = /* @__PURE__ */ function() {
+  function Triplet2(value0, value1, value22) {
+    this.value0 = value0;
+    this.value1 = value1;
+    this.value2 = value22;
+  }
+  ;
+  Triplet2.create = function(value0) {
+    return function(value1) {
+      return function(value22) {
+        return new Triplet2(value0, value1, value22);
+      };
+    };
+  };
+  return Triplet2;
+}();
 var wholePart = function(x) {
   return toNumber(floor2(x));
 };
@@ -32118,10 +32135,13 @@ var voiceInWindowUnlooped = function(x1) {
           return [new Tuple(x1, 2.666)];
         }
         ;
-        throw new Error("Failed pattern match at Visualisation (line 174, column 1 - line 174, column 92): " + [x1.constructor.name, x2.constructor.name, ws2.constructor.name, we2.constructor.name]);
+        throw new Error("Failed pattern match at Visualisation (line 284, column 1 - line 284, column 92): " + [x1.constructor.name, x2.constructor.name, ws2.constructor.name, we2.constructor.name]);
       };
     };
   };
+};
+var thrd = function(v) {
+  return v.value2;
 };
 var svgAttributeToProp = function(v) {
   return attr2(v.value0)(v.value1);
@@ -32140,11 +32160,14 @@ var stop1 = /* @__PURE__ */ function() {
     children: fromFoldable6([])
   });
 }();
+var snd3 = function(v) {
+  return v.value1;
+};
 var removeRemanent = function(we2) {
   return function(xs) {
     var lasty = fromMaybe(new Tuple(0, 0))(last(xs));
-    var $53 = snd(lasty) > we2;
-    if ($53) {
+    var $79 = snd(lasty) > we2;
+    if ($79) {
       return reverse2(cons2(new Tuple(fst(lasty), we2))(reverse2(fromMaybe([new Tuple(0, 0)])(init(xs)))));
     }
     ;
@@ -32165,13 +32188,13 @@ var svgNodeToHtml = function(v) {
     return text5("");
   }
   ;
-  throw new Error("Failed pattern match at Visualisation (line 385, column 1 - line 385, column 52): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Visualisation (line 495, column 1 - line 495, column 52): " + [v.constructor.name]);
 };
 var svgElementToHtmlWithAttrs = function(ele) {
   return function(newAttrs) {
     var children2 = fromFoldable1(map29(svgNodeToHtml)(ele.children));
     var attrs = fromFoldable1(map29(svgAttributeToProp)(ele.attributes));
-    return elementNS(ns)(ele.name)(append7(attrs)(newAttrs))(children2);
+    return elementNS(ns)(ele.name)(append12(attrs)(newAttrs))(children2);
   };
 };
 var svgElementToHtml = function(ele) {
@@ -32209,7 +32232,7 @@ var headShowingAndMultipleVoices = function(x1) {
           return concat2([[first], middleWholes, [andLast]]);
         }
         ;
-        throw new Error("Failed pattern match at Visualisation (line 194, column 1 - line 194, column 99): " + [x1.constructor.name, x2.constructor.name, we2.constructor.name, voiceAtWE.constructor.name]);
+        throw new Error("Failed pattern match at Visualisation (line 304, column 1 - line 304, column 99): " + [x1.constructor.name, x2.constructor.name, we2.constructor.name, voiceAtWE.constructor.name]);
       };
     };
   };
@@ -32234,6 +32257,45 @@ var funca2 = function(dictFunctor) {
   };
 };
 var funca21 = /* @__PURE__ */ funca2(functorArray);
+var fst3 = function(v) {
+  return v.value0;
+};
+var funquilla = function($copy_x1Converged) {
+  return function($copy_x2Converged) {
+    return function($copy_v) {
+      var $tco_var_x1Converged = $copy_x1Converged;
+      var $tco_var_x2Converged = $copy_x2Converged;
+      var $tco_done = false;
+      var $tco_result;
+      function $tco_loop(x1Converged, x2Converged, v) {
+        if (v instanceof Nil) {
+          $tco_done = true;
+          return new Tuple(x1Converged, x2Converged);
+        }
+        ;
+        if (v instanceof Cons) {
+          var convergingFrom = fst3(v.value0) * thrd(v.value0);
+          var convergedTo = (x2Converged - x1Converged) * snd3(v.value0);
+          var convergencePoint = x1Converged + convergedTo;
+          var convergingX1 = convergencePoint - convergingFrom;
+          var convergingX2 = convergingX1 + fst3(v.value0);
+          $tco_var_x1Converged = convergingX1;
+          $tco_var_x2Converged = convergingX2;
+          $copy_v = v.value1;
+          return;
+        }
+        ;
+        throw new Error("Failed pattern match at Visualisation (line 206, column 1 - line 206, column 68): " + [x1Converged.constructor.name, x2Converged.constructor.name, v.constructor.name]);
+      }
+      ;
+      while (!$tco_done) {
+        $tco_result = $tco_loop($tco_var_x1Converged, $tco_var_x2Converged, $copy_v);
+      }
+      ;
+      return $tco_result;
+    };
+  };
+};
 var drawVoiceLines = function(x1) {
   return function(x2) {
     return function(y) {
@@ -32276,12 +32338,12 @@ var nextBeat = function(metre) {
             return toNumber(ceil2(wsInMetre)) + offsetInMetre;
           }
           ;
-          throw new Error("Failed pattern match at Visualisation (line 237, column 13 - line 238, column 86): " + []);
+          throw new Error("Failed pattern match at Visualisation (line 347, column 13 - line 348, column 86): " + []);
         }();
         return nextBeatInMetre * metre;
       }
       ;
-      throw new Error("Failed pattern match at Visualisation (line 231, column 1 - line 231, column 48): " + [metre.constructor.name, offset.constructor.name, ws2.constructor.name]);
+      throw new Error("Failed pattern match at Visualisation (line 341, column 1 - line 341, column 48): " + [metre.constructor.name, offset.constructor.name, ws2.constructor.name]);
     };
   };
 };
@@ -32297,7 +32359,7 @@ var findBeats$prime = function(dur) {
           return cons2(nextBeat(dur)(x1)(ws2))(findBeats$prime(dur)(x1)(ws2 + dur)(we2));
         }
         ;
-        throw new Error("Failed pattern match at Visualisation (line 226, column 1 - line 226, column 66): " + [dur.constructor.name, x1.constructor.name, ws2.constructor.name, we2.constructor.name]);
+        throw new Error("Failed pattern match at Visualisation (line 336, column 1 - line 336, column 66): " + [dur.constructor.name, x1.constructor.name, ws2.constructor.name, we2.constructor.name]);
       };
     };
   };
@@ -32307,15 +32369,15 @@ var calculateVoiceLines = function(coords2) {
     return drawVoiceLines(x.x1)(x.x2)(x.y)(0.5);
   })(coords2);
 };
-var calculateStartOfMetricVoice = function(dictSemiring) {
+var calculateStartConvergent = function(dictSemiring) {
   var mul1 = mul(dictSemiring);
   return function(dictRing) {
     var sub22 = sub(dictRing);
-    return function(durSecsDef) {
-      return function(convergenceTo) {
+    return function(durSecsConverged) {
+      return function(convergeTo) {
         return function(durSecsVoice) {
           return function(convergeFrom) {
-            var cTo = mul1(convergenceTo)(durSecsDef);
+            var cTo = mul1(convergeTo)(durSecsConverged);
             var cFrom2 = mul1(convergeFrom)(durSecsVoice);
             var startOfVoice = sub22(cTo)(cFrom2);
             return startOfVoice;
@@ -32325,7 +32387,7 @@ var calculateStartOfMetricVoice = function(dictSemiring) {
     };
   };
 };
-var calculateStartOfMetricVoice1 = /* @__PURE__ */ calculateStartOfMetricVoice(semiringNumber)(ringNumber);
+var calculateStartConvergent1 = /* @__PURE__ */ calculateStartConvergent(semiringNumber)(ringNumber);
 var bpmToFreq = function(bpm) {
   return 1 / 60 * bpm;
 };
@@ -32362,7 +32424,75 @@ var durFromRhythmic = function(v) {
       })(v.value0));
     }
     ;
-    throw new Error("Failed pattern match at Visualisation (line 290, column 1 - line 290, column 47): " + [v.constructor.name, tempo2.constructor.name]);
+    throw new Error("Failed pattern match at Visualisation (line 400, column 1 - line 400, column 47): " + [v.constructor.name, tempo2.constructor.name]);
+  };
+};
+var findX1AndX2 = function($copy_mapa) {
+  return function($copy_$$eval) {
+    return function($copy_v) {
+      return function($copy_v1) {
+        var $tco_var_mapa = $copy_mapa;
+        var $tco_var_$$eval = $copy_$$eval;
+        var $tco_var_v = $copy_v;
+        var $tco_done = false;
+        var $tco_result;
+        function $tco_loop(mapa, $$eval2, v, v1) {
+          if (v.value0 instanceof Kairos) {
+            var x1Converged = $$eval2 + v.value0.value0;
+            var x2Converged = x1Converged + durFromRhythmic(v.value1)(v.value0.value1);
+            $tco_done = true;
+            return funquilla(x1Converged)(x2Converged)(v1);
+          }
+          ;
+          if (v.value0 instanceof Metric) {
+            var dur = durFromRhythmic(v.value1)(v.value0.value2);
+            var x1Converged = calculateStartConvergent1(defVoiceInSecs)(v.value0.value0)(dur)(v.value0.value1);
+            var x2Converged = x1Converged + dur;
+            $tco_done = true;
+            return funquilla(x1Converged)(x2Converged)(v1);
+          }
+          ;
+          if (v.value0 instanceof Converge) {
+            var dur = durFromRhythmic(v.value1)(v.value0.value3);
+            var xs$prime = new Cons(new Triplet(dur, v.value0.value1, v.value0.value2), v1);
+            var convergedRecursive = fromMaybe(new Temporal(new Kairos(0, 0), O.value, false))(lookup6(v.value0.value0)(mapa));
+            $tco_var_mapa = mapa;
+            $tco_var_$$eval = $$eval2;
+            $tco_var_v = convergedRecursive;
+            $copy_v1 = xs$prime;
+            return;
+          }
+          ;
+          throw new Error("Failed pattern match at Visualisation (line 216, column 1 - line 216, column 97): " + [mapa.constructor.name, $$eval2.constructor.name, v.constructor.name, v1.constructor.name]);
+        }
+        ;
+        while (!$tco_done) {
+          $tco_result = $tco_loop($tco_var_mapa, $tco_var_$$eval, $tco_var_v, $copy_v1);
+        }
+        ;
+        return $tco_result;
+      };
+    };
+  };
+};
+var convergeFunc = function(mapa) {
+  return function(convergedKey) {
+    return function($$eval2) {
+      return function(durInSecs1) {
+        return function(cTo) {
+          return function(cFrom2) {
+            var convergedValue = fromMaybe(new Temporal(new Kairos(0, 0), O.value, false))(lookup6(convergedKey)(mapa));
+            var cFromInSecs = durInSecs1 * cFrom2;
+            var v = findX1AndX2(mapa)($$eval2)(convergedValue)(new Cons(new Triplet(durInSecs1, cTo, cFrom2), Nil.value));
+            var cToInSecs = (v.value1 - v.value0) * cTo;
+            var convergencePoint = v.value0 + cToInSecs;
+            var convergingX1 = convergencePoint - cFromInSecs;
+            var convergingX2 = convergingX1 + durInSecs1;
+            return new Tuple(convergingX1, convergingX2);
+          };
+        };
+      };
+    };
   };
 };
 var background = function(dictShow) {
@@ -32429,8 +32559,8 @@ var voiceInWindowLooped = function(x1) {
         }
         ;
         if (x1 > ws2 && x1 <= we2 && x2 >= we2) {
-          var $79 = x1 === we2;
-          if ($79) {
+          var $175 = x1 === we2;
+          if ($175) {
             return [new Tuple(0, 0)];
           }
           ;
@@ -32454,7 +32584,7 @@ var voiceInWindowLooped = function(x1) {
           return findBeats(ws2)(we2)(x2 - x1)(x1);
         }
         ;
-        throw new Error("Failed pattern match at Visualisation (line 184, column 1 - line 184, column 90): " + [x1.constructor.name, x2.constructor.name, ws2.constructor.name, we2.constructor.name]);
+        throw new Error("Failed pattern match at Visualisation (line 294, column 1 - line 294, column 90): " + [x1.constructor.name, x2.constructor.name, ws2.constructor.name, we2.constructor.name]);
       };
     };
   };
@@ -32483,7 +32613,7 @@ var calculateSVGElement = function(mapa) {
             ;
             if (v.value0 instanceof Metric) {
               var dur = durFromRhythmic(v.value1)(v.value0.value2);
-              var startOfVoice = calculateStartOfMetricVoice1(defVoiceInSecs)(v.value0.value0)(dur)(v.value0.value1);
+              var startOfVoice = calculateStartConvergent1(defVoiceInSecs)(v.value0.value0)(dur)(v.value0.value1);
               var looped = filter2(function(x) {
                 return notEq2(x)(new Tuple(0, 0));
               })(voiceInWindowLooped(startOfVoice)(startOfVoice + dur)(ws2)(we2));
@@ -32497,7 +32627,20 @@ var calculateSVGElement = function(mapa) {
               return unlooped;
             }
             ;
-            return [];
+            if (v.value0 instanceof Converge) {
+              var dur = durFromRhythmic(v.value1)(v.value0.value3);
+              var v1 = convergeFunc(mapa)(v.value0.value0)($$eval2)(dur)(v.value0.value1)(v.value0.value2);
+              var unlooped = filter2(function(x) {
+                return notEq2(x)(new Tuple(0, 0));
+              })(voiceInWindowUnlooped(v1.value0)(v1.value1)(ws2)(we2));
+              if (v.value2) {
+                return unlooped;
+              }
+              ;
+              return unlooped;
+            }
+            ;
+            throw new Error("Failed pattern match at Visualisation (line 143, column 1 - line 143, column 127): " + [mapa.constructor.name, ws2.constructor.name, we2.constructor.name, $$eval2.constructor.name, aKey.constructor.name, v.constructor.name]);
           };
         };
       };

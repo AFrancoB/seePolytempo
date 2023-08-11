@@ -1,4 +1,4 @@
-module Visualisation (durFromRhythmic,calculateSVGElements, funca, test1, test2, test3, test4, test5, test6,test7, test8, drawProgram, lineToPercentageInSecs, findBeats, converge, addElapsing, calculateStartOfMetricVoice) where
+module Visualisation (durFromRhythmic,calculateSVGElements, funca, test1, test2, test3, test4, test5, test6,test7, test8, drawProgram, lineToPercentageInSecs, findBeats, converge, addElapsing, testy, funquilla, Triplet(..)) where
 
 import Prelude
 
@@ -26,6 +26,7 @@ import Data.Ord (signum)
 
 import Svg.Parser
 
+import Parsing
 import Parser
 import Rhythm
 
@@ -130,6 +131,7 @@ funca mapa ws we eval = coords
         coords = concat $ fromFoldable $ map (\x -> funca2 x) yTups
 
 -- funca2 :: Tuple Y (Array (Tuple X1 X2))
+-- funca2:: 
 funca2 item = map (\x -> {x1: fst x, x2: snd x, y: toNumber $ fst item} ) $ snd item
 
 
@@ -147,11 +149,102 @@ calculateSVGElement mapa ws we eval aKey (Temporal (Kairos asap tempo) rhythmic 
 
 calculateSVGElement mapa ws we eval aKey (Temporal (Metric cTo cFrom t) rhythmic loop) = if loop then looped else unlooped  
   where dur = durFromRhythmic rhythmic t
-        startOfVoice = calculateStartOfMetricVoice defVoiceInSecs cTo dur cFrom 
+        startOfVoice = calculateStartConvergent defVoiceInSecs cTo dur cFrom 
         unlooped = filter (\x -> x /= (Tuple 0.0 0.0)) $ voiceInWindowUnlooped startOfVoice (startOfVoice+dur) ws we
         looped = filter (\x -> x /= (Tuple 0.0 0.0)) $ voiceInWindowLooped startOfVoice (startOfVoice+dur) ws we
 
-calculateSVGElement mapa ws we eval aKey _ = []  -- 
+calculateSVGElement mapa ws we eval aKey (Temporal (Converge convergedKey cTo cFrom t) rhythmic loop) = if loop then unlooped else unlooped
+  where dur = durFromRhythmic rhythmic t
+        (Tuple x1 x2) = convergeFunc mapa convergedKey eval dur cTo cFrom
+        unlooped = filter (\x -> x /= (Tuple 0.0 0.0)) $ voiceInWindowUnlooped x1 x2 ws we
+
+
+
+testy m converging = convergeFunc m keyConverged eval durConverging cTo cFrom
+  where convergingVal = fromMaybe (Temporal (Kairos 0.0 0.0) O false) $ M.lookup converging m  -- debe ser siempre Converge
+        eval = 2.0 
+        keyConverged = funcaTest convergingVal
+        durConverging = funcaTest2 convergingVal
+        (Tuple cTo cFrom) =  funcaTest3 convergingVal
+
+funcaTest (Temporal (Converge convergedKey _ _ _) _ _) = convergedKey
+funcaTest (Temporal _ _ _) = "meh"
+
+funcaTest2 (Temporal (Converge _ _ _ t) rhy _) = durFromRhythmic rhy t
+funcaTest2 (Temporal _ _ _) = 2.666
+
+funcaTest3 (Temporal (Converge _ cTo cFrom _) _ _) = Tuple cTo cFrom
+funcaTest3 (Temporal _ _ _) = Tuple 0.666 2.666
+
+-- calculations of convergent relqationships have a bug, tend to be double the width or half the start position in this program:
+-- \v0 <- 60bpm 0.0 | xxxx ||
+-- \v1 <- 60bpm \v0 0.5 0.0 | xxxx ||
+-- v0 = 0.0 to 4.0, v1 = 4.0 to 8.0 which is wrong. it should go from 2.0 to 6.0
+
+-- probably the issue is at convergeFunc, thus funquilla probably is also weird because it uses the same calculations
+-- I feel that getting the duration in seconds is being applied too many times to the process.
+
+
+convergeFunc:: M.Map String Temporal -> String -> Number -> Number -> Number -> Number -> Tuple Number Number
+convergeFunc mapa convergedKey eval durInSecs cTo cFrom = Tuple convergingX1 convergingX2
+  where cFromInSecs = durInSecs * cFrom 
+        convergedValue = fromMaybe (Temporal (Kairos 0.0 0.0) O false) $ M.lookup convergedKey mapa
+        (Tuple x1 x2) = findX1AndX2 mapa eval convergedValue (Cons (Triplet durInSecs cTo cFrom) Nil) -- Tuple X1 X2
+        cToInSecs = (x2 - x1) * cTo 
+        convergencePoint = x1 + cToInSecs 
+        convergingX1 = convergencePoint - cFromInSecs
+        convergingX2 = convergingX1 + durInSecs
+
+funquilla:: Number -> Number -> List Triplet -> Tuple Number Number
+funquilla x1Converged x2Converged (Nil) = Tuple x1Converged x2Converged 
+funquilla x1Converged x2Converged (Cons x xs) = 
+  let convergedTo = (x2Converged - x1Converged) * (snd3 x)
+      convergingFrom = (fst3 x) * (thrd x) 
+      convergencePoint = x1Converged + convergedTo
+      convergingX1 = convergencePoint - convergingFrom
+      convergingX2 = convergingX1 + (fst3 x)
+  in funquilla convergingX1 convergingX2 xs
+
+findX1AndX2:: M.Map String Temporal -> Number -> Temporal -> List Triplet -> Tuple Number Number
+findX1AndX2 mapa eval (Temporal (Kairos asap t) rhy _) recursive = funquilla x1Converged x2Converged recursive
+  where x1Converged = eval + asap -- always the start of the program
+        x2Converged = x1Converged + (durFromRhythmic rhy t)
+
+findX1AndX2 mapa eval (Temporal (Metric cTo cFrom t) rhy _) recursive = funquilla x1Converged x2Converged recursive
+  where dur = durFromRhythmic rhy t
+        x1Converged = calculateStartConvergent defVoiceInSecs cTo dur cFrom
+        x2Converged = x1Converged + dur
+
+findX1AndX2 mapa eval (Temporal (Converge convergedKey cTo cFrom t) rhy _) xs = findX1AndX2 mapa eval convergedRecursive xs'
+  where convergedRecursive = fromMaybe (Temporal (Kairos 0.0 0.0) O false) $ M.lookup convergedKey mapa
+        dur = durFromRhythmic rhy t
+        xs' = Cons (Triplet dur cTo cFrom) xs
+        
+
+
+data Triplet = Triplet Number Number Number
+
+instance tripletShow :: Show Triplet where
+    show (Triplet x y z) = "triplet " <> show x <> " " <> show y <> " " <> show z
+
+fst3:: Triplet -> Number
+fst3 (Triplet x _ _) = x
+
+snd3:: Triplet -> Number
+snd3 (Triplet _ y _) = y
+
+thrd:: Triplet -> Number
+thrd (Triplet _ _ z) = z
+
+-- check2 :: Map String Temporal -> List String -> String -> Temporal -> Boolean
+-- check2 aMap alreadyRefd aKey (Temporal (Kairos _ _) _ _) = true
+-- check2 aMap alreadyRefd aKey (Temporal (Metric _ _ _) _ _) = true
+-- check2 aMap alreadyRefd aKey (Temporal (Converge anotherKey _ _ _) _ _) =
+--   case lookup anotherKey aMap of
+--     Nothing -> false
+--     Just anotherValue -> case elem aKey alreadyRefd of
+--                            true -> false
+--                            false -> check2 aMap (aKey : alreadyRefd) anotherKey anotherValue
 
 -- TODO:
 ---- tests make all the tests
@@ -164,8 +257,8 @@ calculateSVGElement mapa ws we eval aKey _ = []  --
 
 
 -- durs are in seconds but convergences are in percentage: multiply them
-calculateStartOfMetricVoice durSecsDef convergenceTo durSecsVoice convergeFrom = startOfVoice
-  where cTo = convergenceTo * durSecsDef
+calculateStartConvergent durSecsConverged convergeTo durSecsVoice convergeFrom = startOfVoice
+  where cTo = convergeTo * durSecsConverged
         cFrom = convergeFrom * durSecsVoice
         startOfVoice = cTo - cFrom
 
