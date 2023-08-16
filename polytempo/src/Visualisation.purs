@@ -1,4 +1,4 @@
-module Visualisation (durFromRhythmic,calculateSVGElements, funca, test1, test2, test3, test4, test5, test6,test7, test8, drawProgram, lineToPercentageInSecs, findBeats, converge, addElapsing, testy, funquilla, Triplet(..)) where
+module Visualisation (voiceInWindowLooped, processManyVoices,Onset(..), eventsDurations, Event(..), Index(..), test1, test2, test3, test4, test5, test6,test7, test8, test9, drawProgram) where
 
 import Prelude
 
@@ -13,16 +13,18 @@ import Halogen.VDom.Driver (runUI)
 
 import Data.Tuple
 import Data.Maybe
+import Data.Either
 import Data.Map as M
 import Data.Foldable (sum)
 import Data.Int
 import Data.FunctorWithIndex
-import Data.Array (filter,fromFoldable,(!!), replicate, concat, (..), (:), init, tail, last,head,reverse)
+import Data.Array (filter,fromFoldable,(!!), zipWith, replicate, concat, (..), (:), init, tail, last,head,reverse,zip)
 import Data.List
 import Data.Number.Format (toString)
 import Data.Traversable (scanl)
-import Data.List (fromFoldable,concat) as Li
+import Data.List (fromFoldable,concat,zip,zipWith,length,init) as Li
 import Data.Ord (signum)
+import Data.String as Str
 
 import Svg.Parser
 
@@ -32,21 +34,21 @@ import Rhythm
 
 
 -- drawProgram:: M.Map String Temporal -> Number -> Number -> Number -> HH.HTML p i
-drawProgram mapa ws we eval = svgNodeToHtml $ svgFrame ws we h $ calculateVoiceLines $ funca mapa ws we eval
+drawProgram mapa ws we eval = svgNodeToHtml $ svgFrame ws we h (calculateVoiceSVG $ mapToVoiceCoordinates mapa ws we eval) $ calculateEventSVG $ mapToEventCoordinates mapa ws we eval
   where h = toNumber $ length $ M.values mapa
 ------svgNodeToHtml:: forall p i. SvgNode -> HH.HTML p i
 
-svgFrame:: Number -> Number -> Number -> Array SvgNode -> SvgNode
-svgFrame ws we h nodes = SvgElement { 
+svgFrame:: Number -> Number -> Number -> Array SvgNode -> Array SvgNode -> SvgNode
+svgFrame ws we h voices events = SvgElement { 
     name: "svg"
   , attributes: Li.fromFoldable [ 
       SvgAttribute "xmlns" "http://www.w3.org/2000/svg"
     , SvgAttribute  "viewBox" (show ws <>" -1 " <> show (we - ws) <> " " <> show (h + 1.0))
-    , SvgAttribute "preserveAspectRatio" "xMidYMid meet"
-    , SvgAttribute "height" "350"
+    , SvgAttribute "preserveAspectRatio" "none"
+    , SvgAttribute "height" "500"
     , SvgAttribute "width" "1000"
     ]
-  , children: Li.concat $ Li.fromFoldable [Li.fromFoldable [defs], Li.fromFoldable nodes, Li.fromFoldable [background ws we h]]
+  , children: Li.concat $ Li.fromFoldable [Li.fromFoldable [defs], Li.fromFoldable events, Li.fromFoldable voices, Li.fromFoldable [background ws we h]]
       
   }
 
@@ -95,21 +97,16 @@ background ws we h = SvgElement {
     , SvgAttribute "width" $ show $ we - ws
     , SvgAttribute "height" $ show $ (h + 1.0) + 0.5
     , SvgAttribute "opacity" "50%"
-    , SvgAttribute "fill" "blue"
+    , SvgAttribute "fill" "red"
     ]
   , children: Li.fromFoldable []
 }
 
--- this is for looped events:
--- calculateVoiceDrawing:: Number -> Array Number -> Array SvgNode
--- calculateVoiceDrawing ws widths = map (\x -> drawVoice 4.0 1.0 (fst x) $ snd x) $ zip widths xs
---   where xs = fromMaybe [0.0] $ init $ ws :(scanl (+) ws widths)
+calculateVoiceSVG:: Array Coordinate -> Array SvgNode
+calculateVoiceSVG coords = map (\ x -> drawVoice x.x1 x.x2 x.y 0.5) coords
 
-calculateVoiceLines:: Array Coordinate -> Array SvgNode
-calculateVoiceLines coords = map (\ x -> drawVoiceLines x.x1 x.x2 x.y 0.5) coords
-
-drawVoiceLines:: Number -> Number -> Number -> Number -> SvgNode
-drawVoiceLines x1 x2 y wStroke = SvgElement {name: "rect"
+drawVoice:: Number -> Number -> Number -> Number -> SvgNode
+drawVoice x1 x2 y wStroke = SvgElement {name: "rect"
   , attributes: Li.fromFoldable [ 
       SvgAttribute "x" $ toString x1
     , SvgAttribute "width" $ toString $ x2 - x1
@@ -120,141 +117,174 @@ drawVoiceLines x1 x2 y wStroke = SvgElement {name: "rect"
   , children: Li.fromFoldable []
 }
 
--- make a funca that substitutes the string index of each layer with a Int index 
+calculateEventSVG:: Array Coordinate -> Array SvgNode
+calculateEventSVG coords = map (\ x -> drawEvent x.x1 x.x2 x.y 0.5) coords
 
-funca:: M.Map String Temporal -> Number -> Number -> Number -> Array Coordinate
-funca mapa ws we eval = coords
-  where calculated = calculateSVGElements mapa ws we eval
+--  <circle cx="50" cy="50" r="40" stroke="black" stroke-width="3" fill="red" />
+
+drawEvent:: Number -> Number -> Number -> Number -> SvgNode
+drawEvent x1 x2 y wStroke = SvgElement {name: "circle"
+  , attributes: Li.fromFoldable [ 
+      SvgAttribute "cx" $ toString x1
+    , SvgAttribute "cy" $ toString (y + 0.05)
+    , SvgAttribute "r" $ toString 0.05
+    , SvgAttribute "fill" "black"
+    , SvgAttribute "opacity" "0.85"]
+  , children: Li.fromFoldable []
+}
+
+-- svg stuff above this point
+mapToEventCoordinates:: M.Map String Temporal -> Number -> Number -> Number -> Array Coordinate
+mapToEventCoordinates mapa ws we eval = coords
+  where calculated = calculateEventsX1 mapa ws we eval
         vals = M.values calculated
         len = length vals
-        yTups = zip (range 0 len) vals  -- List (Tuple Y (Array (Tuple X1 X2)))
-        coords = concat $ fromFoldable $ map (\x -> funca2 x) yTups
+        yTups = Li.zip (range 0 len) vals  -- List (Tuple Y (Array X1))
+        toCoordinate item = map (\x -> {x1: x, x2: 0.0, y: toNumber $ fst item} ) $ snd item
+        coords = concat $ fromFoldable $ map (\x -> toCoordinate x) yTups
 
--- funca2 :: Tuple Y (Array (Tuple X1 X2))
--- funca2:: 
-funca2 item = map (\x -> {x1: fst x, x2: snd x, y: toNumber $ fst item} ) $ snd item
+calculateEventsX1:: M.Map String Temporal -> Number -> Number -> Number -> M.Map String (Array  Number)
+calculateEventsX1 mapa ws we eval = mapWithIndex (calculateEventX1 mapa ws we eval) mapa 
+
+calculateEventX1:: M.Map String Temporal -> Number -> Number -> Number -> String -> Temporal -> Array Number  -- Tuple X1 X2
+calculateEventX1 mapa ws we eval aKey (Temporal (Kairos asap tempo) rhythmic loop) = if loop then looped else unlooped-- if loop then looped else unlooped
+  where x1 = eval + asap -- always the start of the program
+        dur = durFromRhythmic rhythmic tempo
+        x2 = x1 + dur
+        psPercent = fromFoldable $ rhythmicToOnsets rhythmic -- Array Onset
+        ps = map (\(Onset bool pos) -> (Onset bool (pos * dur))) psPercent
+        xs = map (\ (Onset bool pos) -> x1 + pos) ps
+        unlooped = map f $ filter isRight $ map (\x -> eventInWindowUnlooped x ws we) $ fromFoldable xs
+        voices = voiceInWindowLooped x1 x2 ws we -- [Tuple x1 x2]
+        looped = map f $ filter isRight $ processManyVoices voices dur psPercent
+
+calculateEventX1 mapa ws we eval aKey (Temporal (Metric cTo cFrom t) rhythmic loop) = if loop then looped else unlooped  
+  where dur = durFromRhythmic rhythmic t
+        x1 = calculateStartConvergent defVoiceInSecs cTo dur cFrom 
+        x2 = x1 + dur
+        psPercent = fromFoldable $ rhythmicToOnsets rhythmic -- Array Onset
+        ps = map (\(Onset bool pos) -> (Onset bool (pos * dur))) psPercent
+        xs = map (\ (Onset bool pos) -> x1 + pos) ps
+        unlooped = map f $ filter isRight $ map (\x -> eventInWindowUnlooped x ws we) $ fromFoldable xs
+        voices = voiceInWindowLooped x1 x2 ws we -- [Tuple x1 x2]
+        looped = map f $ filter isRight $ processManyVoices voices dur psPercent
+
+calculateEventX1 mapa ws we eval aKey (Temporal (Converge convergedKey cTo cFrom t) rhythmic loop) = if loop then looped else unlooped
+  where dur = durFromRhythmic rhythmic t
+        (Tuple x1 x2) = convergeFunc mapa convergedKey eval dur cTo cFrom
+        psPercent = fromFoldable $ rhythmicToOnsets rhythmic -- Array Onset
+        ps = map (\(Onset bool pos) -> (Onset bool (pos * dur))) psPercent
+        xs = map (\ (Onset bool pos) -> x1 + pos) ps
+        unlooped = map f $ filter isRight $ map (\x -> eventInWindowUnlooped x ws we) $ fromFoldable xs
+        voices = voiceInWindowLooped x1 x2 ws we -- [Tuple x1 x2]
+        looped = map f $ filter isRight $ processManyVoices voices dur psPercent
+
+-- this two will work only in cases where the start of the voices is showing
+processManyVoices:: Array (Tuple Number Number) -> Number -> Array Onset -> Array (Either String Number) 
+processManyVoices voices voiceDur eventsPercen = concat $ map (\voice -> processEventsInVoice voice voiceDur eventsPercen) voices
+
+processEventsInVoice:: Tuple Number Number -> Number -> Array Onset -> Array (Either String Number)
+processEventsInVoice voice voiceDur eventsPercen = map (\(Onset b pos) -> x1VisibleInWindow voice voiceDur pos) eventsPercen
+
+x1VisibleInWindow:: Tuple Number Number -> Number -> Number -> Either String Number
+x1VisibleInWindow (Tuple x1 x2) voiceDur x = eventInW
+  where eventPos = x1 + (x * voiceDur)
+        eventInW = if eventPos < x2 then Right eventPos else Left "nothing"
+
+firstSemiVisible:: Tuple Number Number -> Number -> Number
+firstSemiVisible (Tuple x1 x2) durVoice = cutPointInPercen
+  where cutPointInPercen = (durVoice - (durVoice - (x2 - x1))) / durVoice
+-- a number representing a percentage below which everything is filtered out
 
 
-calculateSVGElements:: M.Map String Temporal -> Number -> Number -> Number -> M.Map String (Array (Tuple Number Number))
-calculateSVGElements mapa ws we eval = mapWithIndex (calculateSVGElement mapa ws we eval) mapa 
+-- testa:: M.Map String Temporal -> 
+-- testa pr ws we eval = (\m -> calculateEventX1 m ws we eval "v0" <$> val) parsed
+--   where parsed = runParser pr polytemporal 
+--         val = fromMaybe (Temporal (Kairos 0.0 0.0) O false) <$> M.lookup "v0" <$> parsed
+
+f:: Either String Number -> Number
+f (Left x) = 0.0
+f (Right x) = x
+
+eventInWindowUnlooped:: Number -> Number -> Number -> Either String Number
+eventInWindowUnlooped x ws we 
+  | x > we = Left "nothing"
+  | x < ws = Left "nothing"
+  | otherwise = Right x
+
+---
+
+mapToVoiceCoordinates:: M.Map String Temporal -> Number -> Number -> Number -> Array Coordinate
+mapToVoiceCoordinates mapa ws we eval = coords
+  where calculated = calculateVoicesX1X2 mapa ws we eval
+        vals = M.values calculated
+        len = length vals
+        yTups = Li.zip (range 0 len) vals  -- List (Tuple Y (Array (Tuple X1 X2)))
+        toCoordinate item = map (\x -> {x1: fst x, x2: snd x, y: toNumber $ fst item} ) $ snd item
+        coords = concat $ fromFoldable $ map (\x -> toCoordinate x) yTups
+
+
+calculateVoicesX1X2:: M.Map String Temporal -> Number -> Number -> Number -> M.Map String (Array (Tuple Number Number))
+calculateVoicesX1X2 mapa ws we eval = mapWithIndex (calculateVoiceX1X2 mapa ws we eval) mapa 
 
 
 -- make a test
-calculateSVGElement:: M.Map String Temporal -> Number -> Number -> Number -> String -> Temporal -> Array (Tuple Number Number) -- Tuple X1 X2
-calculateSVGElement mapa ws we eval aKey (Temporal (Kairos asap tempo) rhythmic loop) = if loop then looped else unlooped
+calculateVoiceX1X2:: M.Map String Temporal -> Number -> Number -> Number -> String -> Temporal -> Array (Tuple Number Number) -- Tuple X1 X2
+calculateVoiceX1X2 mapa ws we eval aKey (Temporal (Kairos asap tempo) rhythmic loop) = if loop then looped else unlooped
   where startOfVoice = eval + asap -- always the start of the program
         dur = durFromRhythmic rhythmic tempo -- dur of voice in seconds
         unlooped = filter (\x -> x /= (Tuple 0.0 0.0)) $ voiceInWindowUnlooped startOfVoice (startOfVoice+dur) ws we
         looped = filter (\x -> x /= (Tuple 0.0 0.0)) $ voiceInWindowLooped startOfVoice (startOfVoice+dur) ws we
 
-calculateSVGElement mapa ws we eval aKey (Temporal (Metric cTo cFrom t) rhythmic loop) = if loop then looped else unlooped  
+calculateVoiceX1X2 mapa ws we eval aKey (Temporal (Metric cTo cFrom t) rhythmic loop) = if loop then looped else unlooped  
   where dur = durFromRhythmic rhythmic t
         startOfVoice = calculateStartConvergent defVoiceInSecs cTo dur cFrom 
         unlooped = filter (\x -> x /= (Tuple 0.0 0.0)) $ voiceInWindowUnlooped startOfVoice (startOfVoice+dur) ws we
         looped = filter (\x -> x /= (Tuple 0.0 0.0)) $ voiceInWindowLooped startOfVoice (startOfVoice+dur) ws we
 
-calculateSVGElement mapa ws we eval aKey (Temporal (Converge convergedKey cTo cFrom t) rhythmic loop) = if loop then unlooped else unlooped
+calculateVoiceX1X2 mapa ws we eval aKey (Temporal (Converge convergedKey cTo cFrom t) rhythmic loop) = if loop then looped else unlooped
   where dur = durFromRhythmic rhythmic t
         (Tuple x1 x2) = convergeFunc mapa convergedKey eval dur cTo cFrom
         unlooped = filter (\x -> x /= (Tuple 0.0 0.0)) $ voiceInWindowUnlooped x1 x2 ws we
-
-
-
-testy m converging = convergeFunc m keyConverged eval durConverging cTo cFrom
-  where convergingVal = fromMaybe (Temporal (Kairos 0.0 0.0) O false) $ M.lookup converging m  -- debe ser siempre Converge
-        eval = 2.0 
-        keyConverged = funcaTest convergingVal
-        durConverging = funcaTest2 convergingVal
-        (Tuple cTo cFrom) =  funcaTest3 convergingVal
-
-funcaTest (Temporal (Converge convergedKey _ _ _) _ _) = convergedKey
-funcaTest (Temporal _ _ _) = "meh"
-
-funcaTest2 (Temporal (Converge _ _ _ t) rhy _) = durFromRhythmic rhy t
-funcaTest2 (Temporal _ _ _) = 2.666
-
-funcaTest3 (Temporal (Converge _ cTo cFrom _) _ _) = Tuple cTo cFrom
-funcaTest3 (Temporal _ _ _) = Tuple 0.666 2.666
-
--- calculations of convergent relqationships have a bug, tend to be double the width or half the start position in this program:
--- \v0 <- 60bpm 0.0 | xxxx ||
--- \v1 <- 60bpm \v0 0.5 0.0 | xxxx ||
--- v0 = 0.0 to 4.0, v1 = 4.0 to 8.0 which is wrong. it should go from 2.0 to 6.0
-
--- probably the issue is at convergeFunc, thus funquilla probably is also weird because it uses the same calculations
--- I feel that getting the duration in seconds is being applied too many times to the process.
+        looped = filter (\x -> x /= (Tuple 0.0 0.0)) $ voiceInWindowLooped x1 x2 ws we
 
 
 convergeFunc:: M.Map String Temporal -> String -> Number -> Number -> Number -> Number -> Tuple Number Number
-convergeFunc mapa convergedKey eval durInSecs cTo cFrom = Tuple convergingX1 convergingX2
-  where cFromInSecs = durInSecs * cFrom 
+convergeFunc mapa convergedKey eval dur cTo cFrom = findX1AndX2ForConverge mapa eval convergedValue (Cons (Triplet dur cTo cFrom) Nil)
+  where cFromInSecs = dur * cFrom 
         convergedValue = fromMaybe (Temporal (Kairos 0.0 0.0) O false) $ M.lookup convergedKey mapa
-        (Tuple x1 x2) = findX1AndX2 mapa eval convergedValue (Cons (Triplet durInSecs cTo cFrom) Nil) -- Tuple X1 X2
-        cToInSecs = (x2 - x1) * cTo 
-        convergencePoint = x1 + cToInSecs 
-        convergingX1 = convergencePoint - cFromInSecs
-        convergingX2 = convergingX1 + durInSecs
 
-funquilla:: Number -> Number -> List Triplet -> Tuple Number Number
-funquilla x1Converged x2Converged (Nil) = Tuple x1Converged x2Converged 
-funquilla x1Converged x2Converged (Cons x xs) = 
+findX1AndX2ForConverge:: M.Map String Temporal -> Number -> Temporal -> List Triplet -> Tuple Number Number
+findX1AndX2ForConverge mapa eval (Temporal (Kairos asap t) rhy _) recursive = recursBack x1Converged x2Converged recursive
+  where x1Converged = eval + asap -- always the start of the program
+        x2Converged = x1Converged + (durFromRhythmic rhy t)
+
+findX1AndX2ForConverge mapa eval (Temporal (Metric cTo cFrom t) rhy _) recursive = recursBack x1Converged x2Converged recursive
+  where dur = durFromRhythmic rhy t
+        x1Converged = calculateStartConvergent defVoiceInSecs cTo dur cFrom
+        x2Converged = x1Converged + dur
+
+findX1AndX2ForConverge mapa eval (Temporal (Converge convergedKey cTo cFrom t) rhy _) xs = findX1AndX2ForConverge mapa eval convergedRecursive xs'
+  where convergedRecursive = fromMaybe (Temporal (Kairos 0.0 0.0) O false) $ M.lookup convergedKey mapa
+        dur = durFromRhythmic rhy t
+        xs' = Cons (Triplet dur cTo cFrom) xs
+
+recursBack:: Number -> Number -> List Triplet -> Tuple Number Number
+recursBack x1Converged x2Converged (Nil) = Tuple x1Converged x2Converged 
+recursBack x1Converged x2Converged (Cons x xs) = 
   let convergedTo = (x2Converged - x1Converged) * (snd3 x)
       convergingFrom = (fst3 x) * (thrd x) 
       convergencePoint = x1Converged + convergedTo
       convergingX1 = convergencePoint - convergingFrom
       convergingX2 = convergingX1 + (fst3 x)
-  in funquilla convergingX1 convergingX2 xs
-
-findX1AndX2:: M.Map String Temporal -> Number -> Temporal -> List Triplet -> Tuple Number Number
-findX1AndX2 mapa eval (Temporal (Kairos asap t) rhy _) recursive = funquilla x1Converged x2Converged recursive
-  where x1Converged = eval + asap -- always the start of the program
-        x2Converged = x1Converged + (durFromRhythmic rhy t)
-
-findX1AndX2 mapa eval (Temporal (Metric cTo cFrom t) rhy _) recursive = funquilla x1Converged x2Converged recursive
-  where dur = durFromRhythmic rhy t
-        x1Converged = calculateStartConvergent defVoiceInSecs cTo dur cFrom
-        x2Converged = x1Converged + dur
-
-findX1AndX2 mapa eval (Temporal (Converge convergedKey cTo cFrom t) rhy _) xs = findX1AndX2 mapa eval convergedRecursive xs'
-  where convergedRecursive = fromMaybe (Temporal (Kairos 0.0 0.0) O false) $ M.lookup convergedKey mapa
-        dur = durFromRhythmic rhy t
-        xs' = Cons (Triplet dur cTo cFrom) xs
-        
-
-
-data Triplet = Triplet Number Number Number
-
-instance tripletShow :: Show Triplet where
-    show (Triplet x y z) = "triplet " <> show x <> " " <> show y <> " " <> show z
-
-fst3:: Triplet -> Number
-fst3 (Triplet x _ _) = x
-
-snd3:: Triplet -> Number
-snd3 (Triplet _ y _) = y
-
-thrd:: Triplet -> Number
-thrd (Triplet _ _ z) = z
-
--- check2 :: Map String Temporal -> List String -> String -> Temporal -> Boolean
--- check2 aMap alreadyRefd aKey (Temporal (Kairos _ _) _ _) = true
--- check2 aMap alreadyRefd aKey (Temporal (Metric _ _ _) _ _) = true
--- check2 aMap alreadyRefd aKey (Temporal (Converge anotherKey _ _ _) _ _) =
---   case lookup anotherKey aMap of
---     Nothing -> false
---     Just anotherValue -> case elem aKey alreadyRefd of
---                            true -> false
---                            false -> check2 aMap (aKey : alreadyRefd) anotherKey anotherValue
+  in recursBack convergingX1 convergingX2 xs
 
 -- TODO:
 ---- tests make all the tests
----- make the Converge polytemporal relation
 ---- Make the Event visualiser (the events within the voice, this is the one that is easily translated into sound):
       -- So the Tuple Number Number needs to become: Constructor (Tuple Number Number) (List Number), where the list of numbers is the moment in which the event is drawn. 
 
       -- both events and voices need to be indexed. something like: Ix 0 0, Ix 0 1, Ix 0 2, Ix 0 3 would represent a rhythm like xxxx the voice iteration 0 (first) with the event index 0,  voice iteration 0 with event index 1, etc...
-
-
 
 -- durs are in seconds but convergences are in percentage: multiply them
 calculateStartConvergent durSecsConverged convergeTo durSecsVoice convergeFrom = startOfVoice
@@ -263,22 +293,16 @@ calculateStartConvergent durSecsConverged convergeTo durSecsVoice convergeFrom =
         startOfVoice = cTo - cFrom
 
 
-
 defVoiceInSecs = durInSecs 1.0 120.0
 
--- working here
-
--- make a function where 
-
-
---
+--- loop or unlooped:
 
 voiceInWindowUnlooped:: Number -> Number -> Number -> Number -> Array (Tuple Number Number)
 voiceInWindowUnlooped x1 x2 ws we 
   | (x1 > we) && (x2 > we) = [Tuple 0.0 0.0] -- program has not passed yet
   | (x1 < ws) && (x2 < ws) = [Tuple 0.0 0.0] -- program already passed
   | ((x1 >= ws) && (x1 < we)) && (x2 > we) = [Tuple x1 we] -- program is visible in its head
-  | ((x1 >= ws) && (x1 < we)) && ((x2 < we) && (x2 > ws)) = [Tuple x1 x2] -- program is all visible
+  | ((x1 >= ws) && (x1 < we)) && ((x2 <= we) && (x2 > ws)) = [Tuple x1 x2] -- program is all visible
   | ((x1) < ws) && ((x2 <= we) && (x2 >= ws)) = [Tuple ws x2] -- program is visible in its tail
   | (x1 < ws) && (x2 > we) = [Tuple ws we] -- program is visible partially because it is bigger than window
   | otherwise = [Tuple x1 2.666]
@@ -288,7 +312,7 @@ voiceInWindowLooped x1 x2 ws we
   | (x1 > we) && (x2 > we) =  [Tuple 0.0 0.0] 
   | ((x1 > ws) && (x1 <= we)) && (x2 >= we) = if (x1 == we) then [Tuple 0.0 0.0] else [Tuple x1 we] 
   | ((x1 > ws) && (x1 < we)) && (x2 < we) = headShowingAndMultipleVoices x1 x2 we voiceAtWE
-    where voiceAtWE = lineToPercentageInSecs (we - x1) (x2 -x1)
+    where voiceAtWE = lineToPercentageInSecs (we - x1) (x2 - x1)
   | (x1 < ws) && ((x2 < we) && (x2 > ws)) = findBeats ws we (x2 - x1) x1
   | (x1 < ws) && (x2 > we) = [Tuple ws we]
   | otherwise = findBeats ws we (x2 - x1) x1
@@ -350,15 +374,8 @@ wholePart x = toNumber $ floor x
 lineToPercentageInSecs:: Number -> Number -> Number
 lineToPercentageInSecs moment dur = moment / dur
 
-  
-type Coordinate = {
-  x1:: Number,
-  x2:: Number,
-  y:: Number
-  }
 
-
--- tests for voiceInWindowEvalUnlooped:
+-- tests for:
 -- Eval Unlooped if voice is in front window span:
 test1 = voiceInWindowUnlooped 3.5 4.5 1.0 2.0 -- must be 0.0 0.0
 
@@ -383,62 +400,75 @@ test6 = voiceInWindowUnlooped 1.5 2.5 1.0 3.0 -- must be
 test7 = voiceInWindowLooped 3.5 4.5 1.0 2.0 -- must be 0.0 0.0
 
 -- if voice is past window span:
-test8 = voiceInWindowLooped 1.5 2.5 3.0 4.0 -- must be 3.0 to 3.5 and 3.5 4.0
+test8 = voiceInWindowLooped 1.5 2.5 1.0 2.0 -- must be 3.0 to 3.5 and 3.5 4.0
 
--- -- if mutliple 
--- test9 =
+-- -- if mutliple         -- x1  x2  ws we
+test9 = voiceInWindowLooped 1.5 2.5 1.0 3.0
 
 -- the subdivision case is still missing
 durFromRhythmic:: Rhythmic -> Number -> Number
 durFromRhythmic X tempo = durInSecs 1.0 tempo 
 durFromRhythmic O tempo = durInSecs 1.0 tempo
 durFromRhythmic (Sd rhy) tempo = durInSecs 1.0 tempo
-durFromRhythmic (Repeat xs n) tempo = (durFromRhythmic xs tempo) * (toNumber n) 
+durFromRhythmic (Repeat rhy n) tempo = (durFromRhythmic rhy tempo) * (toNumber n) 
 durFromRhythmic (Rhythmics xs) tempo = sum $ map (\x -> durFromRhythmic x tempo) xs
 
 
-convergeMetric moment dur2 tempo2 cF = converge moment 1.0 120.0 0.0 dur2 tempo2 cF
+data Onset = Onset Boolean Number 
 
--- output: Tuple voice1PercentageAtMoment voice2PercentageAtMoment 
-converge:: Number -> Number -> Number -> Number -> Number -> Number -> Number -> Tuple Number Number
-converge moment dur1 tempo1 convergedAt dur2 tempo2 convergingFrom = Tuple (conv1*dur1) $ (conv2 + (lineToPercentage ((convergingFrom*durInSecs dur2 tempo2) - (convergedAt*durInSecs dur1 tempo1)) dur2 tempo2)) * dur2
-    where conv1 = lineToPercentage moment dur1 tempo1
-          conv2 = lineToPercentage moment dur2 tempo2
+instance Show Onset where
+    show (Onset true n) =  "(X" <> " beatPos:" <> (Str.take 8 $ show n) <> ")"
+    show (Onset false n) = "(O" <> " beatPos:" <> (Str.take 8 $ show n) <> ")"
 
-findPoint:: Number -> Number -> Number -> Number -> Number
-findPoint moment point dur tempo = ((durInSecs dur tempo)*point) - moment
+instance Ord Onset where
+    compare (Onset bool1 pos1) (Onset bool2 pos2) = pos1 `compare` pos2  
 
-lineToPercentage:: Number -> Number -> Number -> Number
-lineToPercentage moment dur tempo = moment / durInSecs dur tempo
+instance Eq Onset where 
+    eq (Onset bool1 pos1) (Onset bool2 pos2) = pos1 == pos2
 
--- recibe duracion de la linea en unidades de tempo y tempo y vomita duracion de la linea en secs  
+rhythmicToRefrainDuration:: Rhythmic -> Number -- does not need Tempo...?
+rhythmicToRefrainDuration X = 1.0
+rhythmicToRefrainDuration O = 1.0
+rhythmicToRefrainDuration (Sd xs) = 1.0
+rhythmicToRefrainDuration (Repeat xs n) = foldl (+) 0.0 x
+    where x = replicate n $ rhythmicToRefrainDuration xs
+rhythmicToRefrainDuration (Rhythmics xs) = foldl (+) 0.0 x
+    where x = map (\x -> rhythmicToRefrainDuration x) xs
+
+rhythmicToOnsets:: Rhythmic -> List Onset
+rhythmicToOnsets rhy = 
+    let refrainDur = rhythmicToRefrainDuration rhy
+        rhythmicSegments = eventsDurations 1.0 rhy
+        durInPercentOfEvents = Cons 0.0 $ (fromMaybe (Li.fromFoldable []) $ Li.init $ scanl (+) 0.0 $ map (\x -> x/refrainDur) $ getDur <$> rhythmicSegments) -- List Number
+    in Li.zipWith (\x y -> Onset x y) (getBool <$> rhythmicSegments) durInPercentOfEvents -- we need to keep the XO
+
+eventsDurations:: Number -> Rhythmic -> List Onset
+eventsDurations pos X =  Li.fromFoldable [Onset true pos]
+eventsDurations pos O =  Li.fromFoldable [Onset false pos]
+eventsDurations dur (Sd xs) = eventsDurations' dur xs
+eventsDurations dur (Repeat xs n) = Li.concat $ map (\x -> eventsDurations dur x) $ Li.fromFoldable $ replicate n xs
+eventsDurations dur (Rhythmics xs) = Li.concat $ map (\x-> eventsDurations dur x) xs
+
+getDur:: Onset -> Number
+getDur (Onset _ x) = x
+
+getBool:: Onset -> Boolean 
+getBool (Onset x _) = x
+
+-- data Refrain = Refrain Int Number MetricStructure EventCount
+eventsDurations':: Number -> Rhythmic -> List Onset
+eventsDurations' dur X = Li.fromFoldable [Onset true dur]
+eventsDurations' dur O = Li.fromFoldable [Onset false dur]
+eventsDurations' dur (Sd xs) = eventsDurations' dur xs
+eventsDurations' dur (Repeat xs n) = Li.concat $ map (\x -> eventsDurations' newDur x) $ Li.fromFoldable $ replicate n xs
+    where newDur = dur / (toNumber n)
+eventsDurations' dur (Rhythmics xs) = Li.concat $ map (\x-> eventsDurations' newDur x) xs
+    where newDur = dur / (toNumber $ length xs)
+
+
+-- -- recibe duracion de la linea en unidades de tempo y tempo y vomita duracion de la linea en secs  
 durInSecs:: Number -> Number -> Number
 durInSecs dur tempo = dur * (bpmToDur tempo)
-
-
-
-
-
--- this funcas use a Tuple that represents  a voice:
-
--- output: Tuple voice1PercentageAtMoment voice2PercentageAtMoment 
-converge':: Number -> Tuple Number Number -> Number -> Tuple Number Number -> Number -> Tuple Number Number
-converge' moment line1 convergedAt line2 convergingFrom = Tuple conv1 (conv2 + (lineToPercentage' ((convergingFrom*durInSecs' line2) - (convergedAt*durInSecs' line1)) line2))
-    where conv1 = lineToPercentage' moment line1
-          conv2 = lineToPercentage' moment line2
-
-findPoint':: Number -> Number -> Tuple Number Number -> Number
-findPoint' moment point line = ((durInSecs' line)*point) - moment
-
-lineToPercentage':: Number -> Tuple Number Number -> Number
-lineToPercentage' moment line = moment / durInSecs' line
-
-durInSecs':: Tuple Number Number -> Number
-durInSecs' line = fst line * (bpmToDur (snd line))
-
-line1' = Tuple 12.0 90.0 -- 13 time untis at 90 bpm
-
-line2' = Tuple 12.0 120.0 -- 17 time untis at 135 bpm
 
 bpmToFreq bpm = (1.0/60.0)* bpm
 
@@ -447,24 +477,35 @@ freqToDur freq = 1.0 / freq
 bpmToDur bpm = 1.0 / bpmToFreq bpm
 
 
+data Index = Index Int Int (Array Int) 
 
+instance indexShow :: Show Index where
+    show (Index x y z) = "index " <> show x <> " " <> show y <> " " <> show z
 
+data Event = Event Number Boolean Index
 
+instance eventShow :: Show Event where
+    show (Event x y z) = "event " <> show x <> " " <> show y <> " " <> show z
 
+data Triplet = Triplet Number Number Number
 
+instance tripletShow :: Show Triplet where
+    show (Triplet x y z) = "triplet " <> show x <> " " <> show y <> " " <> show z
 
+fst3:: Triplet -> Number
+fst3 (Triplet x _ _) = x
 
+snd3:: Triplet -> Number
+snd3 (Triplet _ y _) = y
 
+thrd:: Triplet -> Number
+thrd (Triplet _ _ z) = z
 
--- -- Estuary Tempo Voice: _ | x :|
--- -- Map String Temporal
--- -- data Temporal = Temporal Polytemporal Rhythmic Boolean
--- -- data Polytemporal = Kairos Number | Metric Number Number | Converge String Number Number 
-
-
-
-
-
+type Coordinate = {
+  x1:: Number,
+  x2:: Number,
+  y:: Number
+  }
 
 
 
@@ -488,3 +529,22 @@ svgNodeToHtml :: forall p i. SvgNode -> HH.HTML p i
 svgNodeToHtml (SvgElement element) = svgElementToHtml element
 svgNodeToHtml (SvgText str) = HH.text str
 svgNodeToHtml (SvgComment _str) = HH.text ""
+
+
+----
+
+testy m converging = convergeFunc m keyConverged eval durConverging cTo cFrom
+  where convergingVal = fromMaybe (Temporal (Kairos 0.0 0.0) O false) $ M.lookup converging m  -- debe ser siempre Converge
+        eval = 2.0 
+        keyConverged = funcaTest convergingVal
+        durConverging = funcaTest2 convergingVal
+        (Tuple cTo cFrom) =  funcaTest3 convergingVal
+
+funcaTest (Temporal (Converge convergedKey _ _ _) _ _) = convergedKey
+funcaTest (Temporal _ _ _) = "meh"
+
+funcaTest2 (Temporal (Converge _ _ _ t) rhy _) = durFromRhythmic rhy t
+funcaTest2 (Temporal _ _ _) = 2.666
+
+funcaTest3 (Temporal (Converge _ cTo cFrom _) _ _) = Tuple cTo cFrom
+funcaTest3 (Temporal _ _ _) = Tuple 0.666 2.666

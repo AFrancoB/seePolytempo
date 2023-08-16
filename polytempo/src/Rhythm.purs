@@ -1,4 +1,4 @@
-module Rhythm(rhythmic, Rhythmic(..)) where
+module Rhythm(rhythmic, rhythmic', Rhythmic(..)) where
 
 import Prelude
 
@@ -37,6 +37,13 @@ rhythmic = do
   x <- choice [try parseRhythmList, try parseSD, try parseRepeat, parseXO]
   y <- choice [(strWS "||" *> pure false), (strWS ":|" *> pure true)]
   pure $ Tuple x y
+
+rhythmic':: P Rhythmic
+rhythmic' = do
+  _ <- pure 1
+  x <- choice [try parseRhythmList, try parseSD, try parseRepeat, parseXO]
+  -- y <- choice [(strWS "||" *> pure false), (strWS ":|" *> pure true)]
+  pure x
 
 parseRhythms:: P Rhythmic
 parseRhythms = do
