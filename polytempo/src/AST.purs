@@ -1,4 +1,4 @@
-module AST (Rhythmic(..), Polytemporal(..), Temporal(..), Event(..), Onset(..), Index(..), Triplet(..), Coordinate(..), fst3, snd3, thrd, showEventIndex, showStructureIndex) where
+module AST (Rhythmic(..), Polytemporal(..), Temporal(..), Event(..), Onset(..), Index(..), Indexer(..), CPAlign(..), Triplet(..), Coordinate(..), fst3, snd3, thrd, showEventIndex, showStructureIndex) where
 
 import Prelude
 
@@ -37,6 +37,33 @@ instance Show Rhythmic where
   show (Sd xs) = "[" <> show xs <> "]"
   show (Repeat xs n) = "!" <> show xs <> "#" <> show n
   show (Rhythmics xs) = show xs
+
+-- CPAlign will provide a convergence point in relation to a part of the program.
+-- mod 4 will align a cp with the next voice start multiple of 4. The convergenceTo value with 'mod 4' will converge to the other voice at the next voice muliplte of 4. If this would be the convergenceFrom, the voice will align to the other voice from its next voice multiple of 4.
+
+-- data Align = Mod Number Number | Mod' Number | Snap Number | Snap' Number | Origin Number  -- this is the goal
+
+data CPAlign = Mod Int Number | Snap Number | Origin  -- this is the first stage
+
+instance Show CPAlign where
+  show (Mod m o) = "cp after first multiple of " <> show m <> " ahead"
+  show (Snap o) = "cp at closest"
+  show  Origin = "cp at origin"
+
+-- Aligners:
+---- Mod Multiple Offset (next start of voice/event multiple of N with an offset number becomes voice 0)
+---- Mod' Multiple Offset (closest multiple, can be in the past already)
+---- Snap cp happens at closest voice or event.
+---- Origin will align the cp at 0 (1st of January, 1970: 12:00 am)
+
+
+data Indexer = Structure Int (Array Int) CPAlign | Process Int CPAlign
+
+instance Show Indexer where
+  show (Structure x xs a) = show x <>"-"<> result <> " " <> show a
+      where subdivisions = foldl (<>) "" $ map (\x -> show x <> ".") xs
+            result = Str.take (Str.length subdivisions - 1) subdivisions
+  show (Process e a) = show e <> " " <> show a
 
 
 data Event = Event Onset Index

@@ -1,4 +1,4 @@
-module Parser(polytemporal, check, test) where
+module Parser(polytemporal, check, test, cpMark) where
 
 import Prelude
 
@@ -68,19 +68,19 @@ metric = do
     _ <- pure 1
     id <- voiceId
     _ <- reserved "<-"
-    x <- choice [toNumber' <$> naturalOrFloat, cTo]
-    y <- choice [toNumber' <$> naturalOrFloat, cFrom]
+    x <- choice [toNumber' <$> naturalOrFloat, cToDef]
+    y <- choice [toNumber' <$> naturalOrFloat, cFromDef]
     t <- tempo <|> pure 120.0 -- the alternative should be same as estuary tempo
     pure $ Tuple id $ Metric x y t
 
-cTo:: P Number 
-cTo = do
+cToDef:: P Number 
+cToDef = do
     _ <- pure 1
     x <- strWS "_ "
     pure 0.0
 
-cFrom:: P Number 
-cFrom = do
+cFromDef:: P Number 
+cFromDef = do
     _ <- pure 1
     x <- charWS '_'
     pure 0.0
@@ -92,8 +92,8 @@ converge = do
     _ <- reserved "<-"
     _ <- whitespace
     voice <- voiceId
-    x <- choice [toNumber' <$> naturalOrFloat, cTo]
-    y <- choice [toNumber' <$> naturalOrFloat, cFrom]
+    x <- choice [toNumber' <$> naturalOrFloat, cToDef]
+    y <- choice [toNumber' <$> naturalOrFloat, cFromDef]
     t <- tempo <|> pure 120.0 -- the alternative should be same as estuary tempo
     pure $ Tuple id $ Converge voice x y t
 
@@ -110,20 +110,35 @@ tempo = do
   _ <- reserved "bpm"
   pure x
 
-cpMark:: P Index
+cpMark:: P Indexer
 cpMark = do
   _ <- pure 1
   x <- parens cpMark'
+  eof
   pure x
 
-cpMark':: P Index
+cpMark':: P Indexer
 cpMark' = do
   _ <- pure 1
+  x <- choice [try cpStructure, cpProcess]
+  pure x
+
+
+cpProcess:: P Indexer 
+cpProcess = do
+  _ <- pure 1
+  a <- choice [mod, snap, origin]
+  e <- natural
+  pure $ Process e a
+
+cpStructure:: P Indexer
+cpStructure = do
+  _ <- pure 1
+  a <- choice [mod, snap, origin]
   v <- natural
-  _ <- reserved "-"
+  _ <- string "-"
   st <- structParser
-  e <- parens natural
-  pure $ Index v st e
+  pure $ Structure v st a
 
 structParser:: P (Array Int)
 structParser = do
@@ -131,6 +146,26 @@ structParser = do
   xs <- natural `sepBy` string "."
   pure $ A.fromFoldable xs
 
+mod:: P CPAlign
+mod = do
+  _ <- pure 1
+  _ <- reserved "mod"
+  n <- natural
+  x <- naturalOrFloat <|> pure (Left 0)
+  pure $ Mod n (toNumber' x)
+
+snap:: P CPAlign
+snap = do
+  _ <- pure 1
+  _ <- reserved "snap"
+  x <- naturalOrFloat <|> pure (Left 0)
+  pure $ Snap (toNumber' x)
+
+origin:: P CPAlign
+origin = do
+  _ <- pure 1
+  _ <- reserved "origin"
+  pure $ Origin
 
 test :: String -> Either String (Map String Temporal)
 test x =
