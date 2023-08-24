@@ -1,4 +1,4 @@
-module Rhythm(rhythmic, rhythmic', Rhythmic(..)) where
+module Rhythm(rhythmic) where
 
 import Prelude
 
@@ -28,6 +28,8 @@ import Parsing.Language (haskellStyle)
 import Parsing.Token (makeTokenParser)
 
 
+import AST
+
 type P = ParserT String Identity 
 
 
@@ -37,13 +39,6 @@ rhythmic = do
   x <- choice [try parseRhythmList, try parseSD, try parseRepeat, parseXO]
   y <- choice [(strWS "||" *> pure false), (strWS ":|" *> pure true)]
   pure $ Tuple x y
-
-rhythmic':: P Rhythmic
-rhythmic' = do
-  _ <- pure 1
-  x <- choice [try parseRhythmList, try parseSD, try parseRepeat, parseXO]
-  -- y <- choice [(strWS "||" *> pure false), (strWS ":|" *> pure true)]
-  pure x
 
 parseRhythms:: P Rhythmic
 parseRhythms = do
@@ -99,23 +94,6 @@ strWS x = do
   x <- string x 
   whitespace
   pure x
-
-
-data Rhythmic =  -- whenPosix, thats it
-  X | -- x
-  O |
-  Sd Rhythmic | -- [x]
-  Repeat Rhythmic Int |
-  Rhythmics (List Rhythmic) -- xoxo
--- Bjorklund
-
-instance Show Rhythmic where
-  show X = "x"
-  show O = "o"
-  show (Sd xs) = "[" <> show xs <> "]"
-  show (Repeat xs n) = "!" <> show xs <> "#" <> show n
-  show (Rhythmics xs) = show xs
-
 
 
 tokenParser = makeTokenParser haskellStyle

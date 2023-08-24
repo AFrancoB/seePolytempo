@@ -1,9 +1,10 @@
-module Parser(polytemporal, Temporal(..), Polytemporal(..), check, test) where
+module Parser(polytemporal, check, test) where
 
 import Prelude
 
 import Data.Identity
 import Data.List (List(..), head, tail, elem, (:), filter)
+import Data.Array (fromFoldable) as A
 import Data.Either
 import Data.Int
 import Data.Tuple (Tuple(..), fst, snd)
@@ -23,6 +24,7 @@ import Parsing.Combinators.Array (many)
 import Parsing.Language (haskellStyle)
 import Parsing.Token (makeTokenParser)
 
+import AST
 import Rhythm
 
 type P = ParserT String Identity
@@ -66,13 +68,13 @@ metric = do
     _ <- pure 1
     id <- voiceId
     _ <- reserved "<-"
-    x <- choice [toNumber' <$> naturalOrFloat, cAt]
+    x <- choice [toNumber' <$> naturalOrFloat, cTo]
     y <- choice [toNumber' <$> naturalOrFloat, cFrom]
     t <- tempo <|> pure 120.0 -- the alternative should be same as estuary tempo
     pure $ Tuple id $ Metric x y t
 
-cAt:: P Number 
-cAt = do
+cTo:: P Number 
+cTo = do
     _ <- pure 1
     x <- strWS "_ "
     pure 0.0
@@ -90,7 +92,7 @@ converge = do
     _ <- reserved "<-"
     _ <- whitespace
     voice <- voiceId
-    x <- choice [toNumber' <$> naturalOrFloat, cAt]
+    x <- choice [toNumber' <$> naturalOrFloat, cTo]
     y <- choice [toNumber' <$> naturalOrFloat, cFrom]
     t <- tempo <|> pure 120.0 -- the alternative should be same as estuary tempo
     pure $ Tuple id $ Converge voice x y t
@@ -107,6 +109,27 @@ tempo = do
   x <- toNumber' <$> naturalOrFloat
   _ <- reserved "bpm"
   pure x
+
+cpMark:: P Index
+cpMark = do
+  _ <- pure 1
+  x <- parens cpMark'
+  pure x
+
+cpMark':: P Index
+cpMark' = do
+  _ <- pure 1
+  v <- natural
+  _ <- reserved "-"
+  st <- structParser
+  e <- parens natural
+  pure $ Index v st e
+
+structParser:: P (Array Int)
+structParser = do
+  _ <- pure 1
+  xs <- natural `sepBy` string "."
+  pure $ A.fromFoldable xs
 
 
 test :: String -> Either String (Map String Temporal)
@@ -130,32 +153,13 @@ check2 aMap alreadyRefd aKey (Temporal (Converge anotherKey _ _ _) _ _) =
                            true -> false
                            false -> check2 aMap (aKey : alreadyRefd) anotherKey anotherValue
 
-
-data Temporal = Temporal Polytemporal Rhythmic Boolean
-
-instance temporalShow :: Show Temporal where
-    show (Temporal x y z) = show x <> " " <> show y <> (if z then " looped" else " unlooped")
-
-
-data Polytemporal = 
-  Kairos Number Number | -- last arg is tempo -- Arg: universal time unit (miliseconds and datetime in purs)
-  -- Kairos starts a program at evaluation time (or as soon as possible), no underlying grid
-  Metric Number Number Number | -- starts a program attached to a default underlying voice (a tempo grid basically) first number is the point to where the new voice will converge, second number is the point from which it converges. first _ is 0 and second _ is 0 (so both voices align at index 0)
-  Converge String Number Number Number -- Args: String is the voice identifier, convergAt (where this voice converges with the identified voice) and convergedFrom (the point of this voice that converges with the identified voice)
-  -- Converge starts a program in relationship with another voice
-
-instance polytemporalShowInstance :: Show Polytemporal where
-  show (Kairos timemark tempo) = "kairos: " <> show timemark <> " tempo: " <> show tempo
-  show (Metric cTo cFrom t) = "voice aligns with metric at "<>show cTo<>" from "<>show cFrom <> " tempo: " <> show t
-  show (Converge voice cTo cFrom t) = "voice aligns with "<>show voice<>" at "<>show cTo<>" from "<>show cFrom <> " tempo: " <> show t
-
-
 tokenParser = makeTokenParser haskellStyle
 parens      = tokenParser.parens
 braces      = tokenParser.braces
 identifier  = tokenParser.identifier
 reserved    = tokenParser.reserved
 naturalOrFloat = tokenParser.naturalOrFloat
+natural = tokenParser.natural
 float = tokenParser.float
 whitespace = tokenParser.whiteSpace
 colon = tokenParser.colon

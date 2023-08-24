@@ -20,9 +20,6 @@ import Data.Number (fromString)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Map (Map(..), lookup, keys, singleton, fromFoldable, toUnfoldable, member)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Set as Set
-
-import Data.String.CodeUnits (fromCharArray)
 
 import Parsing
 import Parsing.String
@@ -33,8 +30,8 @@ import Parsing.Language (haskellStyle)
 import Parsing.Token (makeTokenParser)
 
 import Parser
-import Rhythm
 import Visualisation
+import AST
 
 main :: Effect Unit
 main = HA.runHalogenAff do
@@ -63,7 +60,7 @@ component =
     }
   where
   initialState _ = {
-      program: "v0 <- 120bpm _ | x :|",
+      program: "v0 <- _ 120bpm | x :|",
       ws: Just 0.0,
       we: Just 20.0,
       eval: Just 0.0
@@ -78,7 +75,7 @@ render state =
     , ws "window start: " "0.0"
     , we "window end: " "20.0"
     , eval "evaluation time:" "0.0"
-    , program "program" "\\v0 <- 120bpm _ | x :|"
+    , program "program" "v0 <- _ 120bpm | x :|"
     , check' (f state.ws) (f state.we) (f state.eval) state.program
    ]
 
@@ -96,7 +93,7 @@ check' ws we eval program =
   case runParser program polytemporal of
     Left (ParseError err _) -> HH.text err
     Right aMap -> case check aMap of
-                    true -> drawProgram aMap ws we eval
+                    true -> HH.div_ [drawProgram aMap ws we eval]
                     false -> HH.text "failed the check"
 
 
